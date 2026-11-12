@@ -1,0 +1,114 @@
+# Submission notebook build for run P1.3-01: the SGD LoRA scope series on DEV40 (BRIEF B5 P1.3,
+# B2 Q2, gate G2). The notebook launches the moved solver once per arm below, in this order, each
+# with its own LoRA rank and target modules, and reports per arm the DEV40 score the notebook
+# prints, the timing records (train, decode, selection seconds per puzzle), and the candidates in
+# run_logs/<arm>/. Read by scripts/build_submission.py and scripts/build_kaggle_notebook.py with
+# yaml.safe_load; runbook docs/runbooks/build_submission.md (series mode); pre-run brief
+# docs/prerun/P1.3-01.md. A development build, never to be submitted: its MANIFEST.md says "not
+# for submission" (its notebook is not alyahya737/arc26-submission, and it is a series), although
+# its competition rerun would ignore the arms and run the reference settings once.
+
+# A development notebook of its own, <owner>/<slug>, owner KAGGLE_OWNER of scripts/kaggle_ops.py;
+# a slug belongs to one task branch (docs/prerun/README.md), and alyahya737/arc26-submission
+# keeps only builds meant for submission.
+kaggle_notebook: alyahya737/arc26-lora-scope
+
+# The same private code dataset as every build (ADR-010). The wheel differs from P0.3-01's (the
+# LoRA settings in RunConfig and the moved solver), so it needs a new version from this build.
+code_dataset: alyahya737/arc26-code
+
+# Competition attached: it mounts the data, and only notebooks attached to it get L4s (research
+# note, section 2).
+competition: arc-prize-2026-arc-agi-2
+
+# 4xL4, the scored rerun's hardware: each worker trains and decodes on an L4 of its own there,
+# so per-worker train and decode seconds must be measured the same way, and four workers run
+# the 40 tasks of an arm in about 1.9 h, which lets five arms fit one 12 h session. There is no
+# other accelerator to fall back on: NvidiaL4X1 is not granted (Kaggle ran P0.3-01's NvidiaL4X1
+# push on its default 2xT4, 1 Oct), and T4 has no bf16 and no FlashAttention 2, which the solver
+# needs. The pre-run brief sets the 30-minute queue limit; the fallback is waiting.
+accelerator: NvidiaL4
+
+# Same pinned image and install notebook source as every build (ADR-010).
+reference_metadata: reference/kernel-metadata.json
+
+# Same install notebook version as every build (see configs/submission_P0.5-01.yaml).
+kernel_source_versions:
+  sorokin/pip-install-unsloth-flash-patch: 2
+
+# Same model folder name as every build (K0).
+model_slug: qwen3_4b_grids15_sft139
+
+# DEV40 (arc26.data.DEV40, frozen): 40 tasks, 55 test outputs, stratified by the largest grid
+# side; one task is 2.5 points. The subset Q2's gate is defined on. Quoted so YAML never reads an
+# id as a number.
+subset: [
+  "136b0064", "16de56c4", "195c6913", "20a9e565", "28a6681f", "2ba387bc", "31f7f899",
+  "332f06d7", "3e6067c3", "446ef5d2", "45a5af55", "4a21e3da", "581f7754", "5961cc34",
+  "64efde09", "7b0280bc", "7b5033c1", "7c66cb00", "80a900e0", "8698868d", "89565ca0",
+  "8f3a5a89", "9385bd28", "a25697e4", "b0039139", "b10624e5", "b5ca7ac4", "c7f57c3e",
+  "cbebaa4b", "db0c5428", "db695cfb", "dbff022c", "dd6b8c4b", "de809cff", "dfadab01",
+  "e12f9a14", "e3721c99", "e376de54", "eee78d87", "f560132c",
+]
+
+# One worker per L4, as the reference and the scored rerun.
+workers: 4
+
+# Same PYTHONHASHSEED as run A, P0.5-01, P1.1-01, and P0.3-01: one fixed seed for all
+# comparisons (CLAUDE.md), so every arm draws the same rescoring augmentations.
+hash_seed: 0
+
+# The run solves DEV40 once per arm.
+run_solver: true
+
+# Seconds after the notebook's start, for the whole series: the workers' soft deadline, the
+# competition value (12 h minus 30 min). An arm starts only if the time left before it covers
+# 1.25 times the longest arm so far (SERIES_MARGIN), so the five arms (about 6200 to 6800 s each,
+# docs/prerun/P1.3-01.md section 6) fit, and an arm that cannot finish is not started.
+solver_end_s: 41400
+
+# Seconds after the start: the hard stop, the competition value (12 h minus 20 min). The brief's
+# Timeout is 43200 s, Kaggle's maximum, which leaves the selection of every arm and the logs
+# their 20 minutes after a hard stop.
+solver_kill_s: 42000
+
+# The series, in priority order: an arm that the stop rule refuses is the last in this list.
+# alpha 32 with rsLoRA (scale alpha / sqrt(r)), the learning rate, and the epoch are the
+# notebook's in every arm (the solver's literals). Names: rank, then "attn" (q, k, v, o),
+# "proj" (all seven linear projections), "emb" (embed_tokens and lm_head as full copies, which
+# H cannot emit, ADR-002). An optional sixth arm, r256-proj (r 256 on the seven projections
+# without the embeddings), isolates the embeddings' effect; its cost is in the brief, and it is
+# left out so the series fits the session.
+arms:
+  # (1) The notebook configuration, which the builder requires first; submission.json comes
+  # from it.
+  - name: r256-proj-emb
+    lora_r: 256
+    lora_targets: [q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj,
+                   embed_tokens, lm_head]
+    reason: "The notebook configuration: G2's reference and P2.1's hold-out-off arm; trains embed_tokens and lm_head"
+  # (2) H's default scope (ADR-002): the smallest, so G2 adopts it if it is within the rule.
+  - name: r16-attn
+    lora_r: 16
+    lora_targets: [q_proj, k_proj, v_proj, o_proj]
+    reason: "H's default scope (ADR-002, BRIEF Q2): 11.8M emitted values; embeddings frozen"
+  # (3) Rank 32 on the attention projections (BRIEF B5 P1.3).
+  - name: r32-attn
+    lora_r: 32
+    lora_targets: [q_proj, k_proj, v_proj, o_proj]
+    reason: "Q2's rank expansion on the attention projections: 23.6M emitted values; embeddings frozen"
+  # (4) ADR-002's first expansion: the MLP projections added at rank 16.
+  - name: r16-proj
+    lora_r: 16
+    lora_targets: [q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj]
+    reason: "ADR-002's first expansion, adding gate, up, and down: 33.0M emitted values; embeddings frozen"
+  # (5) Rank 64 on all seven projections: between H's candidates and the notebook's rank.
+  - name: r64-proj
+    lora_r: 64
+    lora_targets: [q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj]
+    reason: "Between H's candidate scopes and the notebook's rank: 132.1M values; embeddings frozen"
+
+# The solver's code (task P2.0, ADR-011): this run ran the moved reference (python -m
+# arc26.nvarc.starter), the default until the split solver passed run P2.0-01 and the default
+# flipped to "split" (2 Oct); the key, added then, keeps this config what ran.
+solver: nvarc

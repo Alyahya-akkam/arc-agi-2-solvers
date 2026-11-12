@@ -1,0 +1,1119 @@
+# Version 11, the competition notebook (alyahya737/arc26-submission), and its development check,
+# run P5.2-01 revision 2 (task P5.2, docs/tasks/P5.2.md, round 2 of 29 Oct): Qwen3.8-Flash-Next
+# served by SGLang on Kaggle's 4 x L4, LLM first on every hidden task in a scored rerun, "think
+# with Python" by default (arc26.agent.toolshot, task P5.3; docs/research/flash_next_harness.md
+# on task/ideas), and in every other session (the version's own run) the paired A/B of plain and
+# tool on P6.9-01's 15 DEV120 tasks. Read by scripts/fn_probe.py, embedded as JSON in the
+# notebook by scripts/build_fn_notebooks.py with the build's commit and file hashes under
+# "build"; runbook docs/runbooks/fn_probe.md; pre-run brief docs/prerun/P5.2-01.md (revision 2).
+# Every engine choice is a value here: the sm89 recipe (docs/research/flash_next_sglang.md on
+# task/ideas) changes values, not code. The CPU twin, configs/P5.2-01-cpu.yaml, extends this file.
+
+# Run id: names run.json and summary.md.
+run_id: P5.2-01
+
+# The project's one fixed seed (CLAUDE.md); sampling is the model's own (sampling below).
+seed: 0
+
+# The Kaggle notebook and the code dataset (scripts/build_fn_notebooks.py).
+kernel:
+  # Version 11 is the next version of the submission notebook, which the human submits (the
+  # orchestrator's order, 29 Oct); this brief names it, so no CPU push may use the slug.
+  id: alyahya737/arc26-submission
+  title: arc26 submission
+  # A notebook kernel: a code competition takes its submission from a notebook.
+  kernel_type: notebook
+  code_file: kaggle_submission.ipynb
+  # Off: a scored rerun has no internet, and accelerated pushes need it off (kaggle_ops.py).
+  enable_internet: false
+  # Kaggle's latest image (pinning latest): it runs Python 3.13.15 (P5.2-00, 29 Oct), so the
+  # venv is built on P5.2-00's standalone CPython 3.12.14 (python312.tar.gz, sha256 6ecf9ba5...),
+  # attached below.
+  docker_image: null
+  # 4 x L4: the weights need about 17.9 GiB per GPU at TP 4 (recipe R6); the scored rerun's
+  # hardware.
+  accelerator: NvidiaL4
+  # The SGLang wheelhouse.
+  dataset_sources: [dfranzen/pennyroyal-v253]
+  # Its own code dataset: the arc26 wheel, this script, and the fake server for the CPU twin,
+  # built from one commit (the human, 9 Oct: one code dataset per concurrent build lineage).
+  # Revision 17: a new slug for the KV4 lineage (the orchestrator, 31 Oct), so the submitted
+  # version 13's arc26-code-fn, which its scored rerun mounts, stays untouched.
+  # Revision 21: a new slug again, because the wheel changes (task P5.8's harness fixes):
+  # version 16 (revision 20) may be submitted, and its scored rerun mounts arc26-code-fn-kv4.
+  # Revision 22: a new slug again (P5.8b in the wheel, the stress check and the health probe in
+  # fn_probe.py): version 17 (revision 21) may be submitted, and its rerun mounts
+  # arc26-code-fn-kv4b.
+  code_dataset: alyahya737/arc26-code-fn-kv4c
+  # Albucino's FP8-table build (116.25 GiB, P5.2-00). The drafter is not attached: no MTP here,
+  # and every input mounts before the first cell.
+  model_sources:
+    - dfranzen/albucino-qwen3.8-flash-next-w4a16-fp8ple/Transformers/default/1
+  # The challenges: the hidden test tasks in a rerun, the evaluation tasks otherwise; the
+  # solutions are never opened here.
+  competition_sources: [arc-prize-2026-arc-agi-2]
+  # P5.2-00's output, version 1 (COMPLETE 29 Oct 01:04): the CPython 3.12.14 tarball and the FA2
+  # wheel (sha256 c65d762d...).
+  kernel_sources:
+    alyahya737/arc26-fn-env: 1
+  # Kaggle's hard stop of the development run, in seconds (revision 16: the engine test on 4 x
+  # L4 after the Sat 31 Oct 03:00 reset; revisions 14 and 15: 330, the boot skipped). The plan
+  # ends at 6,900 s of notebook time, cell 2's guard at 7,020 s; revision 13's development gap
+  # before the first cell was 4 s, so 7,500 leaves about 480 s for the start, cell 3, and the
+  # save, and the run ends itself, never by Kaggle's kill. At most 4.2 quota hours at 2x. The
+  # brief's Timeout. A scored rerun has Kaggle's own 12-hour limit instead, and this value is
+  # not read there.
+  timeout_s: 7500
+
+# competition in a scored rerun (KAGGLE_IS_COMPETITION_RERUN set), else development
+# (scripts/fn_probe.py, run_mode); a fixed value only for tests.
+mode: auto
+
+# Seconds after the notebook's first cell (the notebook passes its start as --session-start).
+time_plan:
+  competition:
+    # Kaggle's 12 hours (43,200 s) less 60 minutes for the time Kaggle counts before the first
+    # cell less 450 s for the end (revision 15, the competition-path audit; revisions up to 14:
+    # 45 minutes, 39,600 and 40,050). The 45 were measured on the 27B's builds (P6.5-02: 36.7
+    # minutes); version 11 mounts about 125 GB of inputs and its rerun's gap is unmeasured
+    # (revision 13's development gap was 4 s), and a notebook past 12 hours scores nothing; the
+    # cost is about 2% of the window. Generation stops 450 s before the end, which covers the
+    # server's stop (60 s, then the group's kill), the logs, and the notebook's final check;
+    # cell 2's guard at 39,270 s, 3,930 s before the 12 hours.
+    generation_stop_s: 38700
+    end_s: 39150
+    # A task still starts with 5 minutes left: a cut, forced reply of about 9k thinking tokens
+    # at 30 per second beats a placeholder.
+    min_start_s: 300
+  development:
+    # Revision 16: the engine test on Kaggle's 4 x L4 with revision 15's competition settings
+    # exactly (competition above is unchanged). Setup about 160 s (revision 15 on Kaggle: the
+    # copy 35.6, python 2.2, install 68.5, tasks 2.8, the tool self-test 1.6, arg_check 46.0);
+    # the boot about 730 s (revision 13: the load 329 s, the decode capture 439 s for batches 1
+    # to 8, about 55 s less for 1 to 3), healthy at about 890 s; the template check's first
+    # generation (its compiles) to about 950 s. The solve then has about 5,650 s to the
+    # generation stop: 3 streams at the planner's context (about 56k at the estimated pool) take
+    # about 1,500 to 1,900 s per task at 30 to 40 tokens per second, so about 9 to 11 of the
+    # 15 tasks start (estimate). Forcing from 6,240 s (solve.force_reserve_s 360).
+    generation_stop_s: 6600
+    # 300 s after the stop: the server's stop (60 s, then the group's kill), the logs (engine.log,
+    # engine_tail.log, memory.jsonl, attempts.jsonl, transcripts), the final check.
+    end_s: 6900
+    # No start with less than 5 minutes before the forcing time: a forced reply of about 9k
+    # thinking tokens at 30 per second still beats a placeholder (competition's value).
+    min_start_s: 300
+
+# The fork's argument resolution on the server's real flags, in a child process before the boot
+# (scripts/fn_probe.py, stage_arg_check): P5.2-03 lost both boots to a flag the fork refuses for
+# this model, found only after the install; the CPU twin now finds such a refusal for free.
+# The edited engine's import, before the boot (revision 20, fn_probe.stage_import_check): version
+# 15 (revision 19) applied every edit and still failed in all three boots at the import of the
+# edited kv_cache_configurator.py (a decorator wrapped the KV4 helper), which the CPU twin's fake
+# server never imports. A child process with the boot's environment imports the four edited
+# modules and, with ARC26_KV4 on, fn_kvq's engine module; a failure with KV4 on restores
+# revision 16's files and turns KV4 off, then checks again. On a CPU box (the twin) an error that
+# names a device counts as a device stop, not a failure, as in the argument check.
+import_check:
+  enabled: true
+  # The first import of torch and the fork's modules on a Kaggle CPU or GPU session: a minute or
+  # two (arg_check's import of server_args took 26 to 58 s); 600 s bounds a hang.
+  timeout_s: 600
+  # The files the fourteen edits change, by module.
+  modules: [sglang.srt.mem_cache.kv_cache_configurator, sglang.srt.model_executor.pool_configurator,
+            sglang.srt.mem_cache.memory_pool, sglang.srt.layers.attention.qwen_sparse_attn_backend,
+            sglang.srt.layers.logits_processor, sglang.srt.layers.moe.moe_runner.marlin,
+            sglang.srt.layers.moe.fused_moe_triton.fused_marlin_moe]
+  # With ARC26_KV4 on, the module the edits import (fn_kvq.pyz on PYTHONPATH).
+  kv4_modules: [fn_kvq.sglang_kv4]
+
+arg_check:
+  # On in every session: about a minute (the import of sglang and the model's config), against a
+  # boot that cannot succeed when the flags are refused.
+  enabled: true
+  # The fork's module with prepare_server_args and ServerArgs (launch_server.py's own path:
+  # prepare, then resolve_once, the call that raised in P5.2-03).
+  module: sglang.srt.server_args
+  # Seconds per flag set: the import and the config read take tens of seconds; a hung child is
+  # killed with its process group and the check reads "error".
+  timeout_s: 300
+  # Flags left out of the check: none here (the CPU twin drops the fake server's own).
+  drop_flags: []
+
+# The engine's health in the solve (the version 10 review: a dead server zeroes the rest).
+health:
+  # A /health poll every 30 s.
+  interval_s: 30
+  # Ten misses in a row (about 7 minutes with engine_alive's 10 s wait) mean dead (revision 15;
+  # was 3). Revision 13's server answered /health 503 while /model_info and /metrics answered
+  # 200 (runs/P5.2-01-r13/run_logs/fn/engine.log, lines 367 to 369), so three misses could
+  # restart a live engine, and a false restart costs a boot (14 minutes on 4 x L4) and, at the
+  # restart limit, every task left; 7 minutes of silence is cheap against that.
+  failures: 10
+  # At most six restarts (revision 15; was 2): with failures at 10 a restart means a real death,
+  # and min_left_s below still stops restarts near the end; past the limit the placeholders stay.
+  max_restarts: 6
+  # No restart with less than 40 minutes before the generation stop: a boot takes 10 to 30.
+  min_left_s: 2400
+  # A task whose requests failed with the engine is queued again once (a task that kills the
+  # engine twice is skipped).
+  max_requeue: 1
+  # Revision 22 (P5.6-01's restart 2, docs/experiments/P5.6-01-forensics.md on task/P5.6): a
+  # thread waiting on the engine lock since restart 1 killed the next engine on one 10 s probe
+  # while it stalled at 0.05 GiB free. A probe now waits 30 s, a kill needs 3 failed probes in a
+  # row (fn_probe.engine_responsive), and a failure seen on one engine instance never probes or
+  # kills the next (Inner.generation).
+  probe_timeout_s: 30
+  kill_probes: 3
+
+# Revision 22: the boot stress check (fn_probe.stage_stress), in both modes, after the template
+# check and before the solve: the solve's largest prefill (the largest openings of the plan's
+# tasks, one per stream the server and solve.max_streams allow, at once, each a distinct prompt)
+# and then every stream decoding about 30 s. P5.6-01's only out-of-memory fault came at exactly
+# that prefill (docs/experiments/P5.6-01-forensics.md); versions 16 and 17 at these settings never
+# faulted (free device memory at least 0.22 GiB), so the check is expected to pass as is.
+stress:
+  enabled: true
+  modes: [development, competition]
+  # About 30 s of decode at about 31 tokens per second per stream (version 17: 31.4).
+  max_new: 1024
+  # Seconds for the batch: 5 prefills of up to 6,896 tokens plus the decode, with room for a slow
+  # first use of the long-prefill kernels.
+  timeout_s: 300
+  # Digits and spaces, as the grids' text; each request starts with its own index line.
+  filler: "0 1 2 3 4 5 6 7 8 9\n"
+  # Only if the check fails at the 2,048 chunk: the server reboots with the smaller prefill of
+  # the researcher's reading (fn_p56_suspects.md, task/ideas 513e835, section 3: the failing
+  # 40 MiB was the PLE short conv's eager buffer, padded to requests x the longest extend) and
+  # checks once more before the ladder's next rung.
+  fallback_flags: {--chunked-prefill-size: 1024, --prefill-max-requests: 4}
+
+# Folders (absolute; the smoke maps them under --root).
+paths:
+  input_root: /kaggle/input
+  # Pulled by kaggle_ops.py pull (run_logs/**: json, jsonl, md, txt, log).
+  out: /kaggle/working/run_logs/fn
+  # The full engine log: outside run_logs, so only the bounded copy is pulled.
+  engine_log: /kaggle/working/fn_engine_full.log
+  # The venv, uv, caches: rebuilt every session, never saved.
+  scratch: /tmp/fn
+  # The competition's file, written atomically after every finished task (competition mode).
+  submission: /kaggle/working/submission.json
+
+# The inputs, each found at its path or by its marker file under /kaggle/input.
+inputs:
+  wheelhouse:
+    # dfranzen's mount path (cell 4).
+    path: /kaggle/input/datasets/dfranzen/pennyroyal-v253
+    marker: requirements.lock
+    hint: pennyroyal
+    required: true
+  env_output:
+    # P5.2-00's output as a kernel source; the mount folder of a notebook output is unverified
+    # for 2026, so the search by marker decides (P3.5's find_input_dirs: either spelling).
+    path: /kaggle/input/notebooks/alyahya737/arc26-fn-env
+    marker: fn_env_output.json
+    hint: [arc26-fn-env, arc26_fn_env]
+    # Not required: with a 3.12 image and no fetched wheel the run needs nothing from it.
+    required: false
+  fa2_output:
+    # The FA2 notebook's output, when attached (kernel.kernel_sources).
+    path: /kaggle/input/notebooks/alyahya737/arc26-fn-fa2
+    marker: fn_env_output.json
+    hint: [arc26-fn-fa2, arc26_fn_fa2]
+    required: false
+  code:
+    # The code dataset; its fn_code.json lists the files, checked against build.files.
+    path: /kaggle/input/datasets/alyahya737/arc26-code-fn-kv4c
+    marker: fn_code.json
+    # The KV4 lineage's dataset first (revision 17); the older name still matches a Modal job's
+    # code mount (datasets/alyahya737/arc26-code-fn, scripts/modal_probe.py), where only one is
+    # attached, as on Kaggle.
+    # Revision 21: its own slug arc26-code-fn-kv4b first (a hint matches as a substring, and
+    # only one code dataset is attached). Revision 22: arc26-code-fn-kv4c.
+    hint: [arc26-code-fn-kv4c, arc26-code-fn]
+    required: true
+  model:
+    path: /kaggle/input/models/dfranzen/albucino-qwen3.8-flash-next-w4a16-fp8ple/transformers/default/1
+    marker: config.json
+    hint: fp8ple
+    required: true
+  drafter:
+    path: /kaggle/input/models/dfranzen/albucino-qwen3-8-flash-next-drafter/transformers/default/1
+    marker: config.json
+    hint: drafter
+    required: false
+  competition:
+    # The K0 mount path (CLAUDE.md, human settings); the marker is the file present in every
+    # session (solve.challenges names what each mode reads; arc26.agent.tasks.load_tasks
+    # refuses a solutions file by name).
+    path: /kaggle/input/competitions/arc-prize-2026-arc-agi-2
+    marker: arc-agi_test_challenges.json
+    hint: arc-prize-2026
+    required: true
+
+# Python 3.12: the image's when it is 3.12, else P5.2-00's python-build-standalone tarball.
+python:
+  want: "3.12"
+  tarball: python312.tar.gz
+
+# The venv (dfranzen's launcher, cell 12), then the extras --no-deps.
+install:
+  enabled: true
+  lock: requirements.lock
+  sglang_glob: sglang-*.whl
+  # Wheels from P5.2-00's and the FA2 notebook's outputs installed --no-deps after the lock:
+  # FlashAttention 2 if built (SGLang's QSA decode on sm89, sgl-project/sglang#36968). The recipe
+  # may add a pattern; a missing file installs nothing.
+  extra_wheels: ["flash_attn-*.whl"]
+  # Seconds for the lock: 6.6 GB of wheels; P6.9-01 installed vLLM's set in 107.8 s, twins 2 to 5
+  # 104 to 121 s from the mount, P5.2-00 903.4 s. 3,600 rather than 1,800: twin 6 passed 1,800
+  # on a slow mount, and a lock that reads files the copy left on the mount (local_inputs) may
+  # need longer; a failed install leaves only placeholders, an hour less of solving does not.
+  # Competition's worst case that still solves: the copy 1,800, python 200, the install's
+  # commands 5,520 (this 3,600, SGLang and FA2 600 each, arc26 300, venv 300, freeze 120), the
+  # argument check 600, the boot 2,700, the first generation 900: 11,720 s, so the generation
+  # window is 39,600 - 11,720 = 27,880 s (24,280 with the fallback boot and its first
+  # generation), against about 36,900 s usually. generation_stop_s and end_s do not move: every
+  # stage is bounded by them.
+  timeout_s: 3600
+
+# The install's inputs copied from the mount to local disk before anything else reads the mount
+# (scripts/fn_probe.py, stage_local_inputs): the twin P5.2-01-cpu6 (30 Oct) lost its install to
+# the mount, uv's lock install from GCSFuse passing its 1,800 s timeout where twins 2 to 5 took
+# 104 to 121 s. The order on the mount: inputs, this copy alone, then the model's precache
+# (below), so the two never share the mount's bandwidth; python, install, and cuda then read
+# local disk.
+local_inputs:
+  # On in every session: the copy costs about 15 to 60 s at version 9's rates and bounds the
+  # install's dependence on the mount.
+  enabled: true
+  # The wheelhouse (about 6.6 GB) and P5.2-00's output (the 3.12 tarball and the FA2 wheel,
+  # 282,944,866 bytes on Modal's copy, P5.2-03's fetch.json): everything the install reads.
+  inputs: [wheelhouse, env_output]
+  # Version 9's warm-up values (configs/submission_P5.1-01.yaml, warmup): 8 readers of 256 MiB
+  # pieces copied 18.6 GB at 469.2 MB/s (P4.7-02's warmup.json); P6.9-02 read 24 MB/s with one.
+  workers: 8
+  piece_mib: 256
+  # Most seconds for the copy: 6.6 GB at 4 MB/s (below twin 6's rate, which did not finish the
+  # lock in 1,800 s) takes 1,650 s; at the limit every file not done is linked to the mount and
+  # the install reads those there, as before.
+  max_s: 1800
+  # Seconds without a byte after which the copy stops and the rest is linked: version 9's 120.
+  stall_s: 120
+  # GB that must stay free beside the copy in /tmp: the venv (about 10 GB) and the caches;
+  # P5.2-00's /tmp had 1,048.8 GiB free.
+  reserve_gb: 40
+
+# Parallel reads of the model mount, after the wheel copy (local_inputs) ends, while the install
+# runs from local disk (dfranzen's cell 6): they warm the
+# first shards and measure the mount's read rate (P6.9-02's GCSFuse read 24 MB/s with one reader,
+# P6.9-03's copy 666.9 MB/s). Bounded, so they cannot slow the boot for long.
+precache:
+  enabled: true
+  inputs: [model]
+  # dfranzen's thread count.
+  threads: 16
+  # dfranzen's chunk.
+  chunk_mib: 32
+  # Seconds: about the install's length, so the reads end before SGLang starts its own. They start
+  # when local_inputs ends, never beside the wheel copy.
+  max_s: 180
+
+# The SGLang server.
+engine:
+  # python -m sglang.launch_server from the venv (task brief).
+  module: sglang.launch_server
+  # A script beside fn_probe.py instead of the module: the smoke's fake server only.
+  script: null
+  # SGLang's default port.
+  port: 30000
+  # The chat endpoint's model name in the template check (the recipe's).
+  served_model_name: flash-next-w4a16
+  # Seconds to healthy: the 125 GB load (unknown mount rate: 3 minutes at 666.9 MB/s, about 85 at
+  # 24 MB/s; research note, section 4), table placement, sm89 kernel compiles, CUDA graphs. 2,700
+  # leaves the development run 4,000 s of solving; slower means the stack is not usable inside a
+  # 12-hour submission anyway. Also bounded by the time left before the generation stop.
+  boot_timeout_s: 2700
+  # One more boot after a failed boot or a failed first generation, with these flags on top
+  # (docs/runbooks/fn_probe.md, failure modes): BF16 KV (no FP8 scratch path; about half the
+  # pool) and no CUDA graphs (the FA2 varlen decode under graphs is untested in the fork; recipe
+  # risk 2), by the fork's current flags (its --help marks --disable-cuda-graph deprecated for
+  # --cuda-graph-backend-{decode,prefill}=disabled; P5.2-00's server_help.txt).
+  # The boot ladder after the first boot (revision 17; fn_probe.boot_rungs, cumulative rungs):
+  # 1. the same flags without KV4 (ARC26_KV4=0): revision 16's FP8 path, for a fault of the KV4
+  #    cache or of fn_kvq's import; the planner reads the new pool after the boot;
+  # 2. then boot_retry_flags (BF16 KV, no CUDA graphs), still without KV4: revision 16's fallback.
+  # Each rung also follows a failed first generation (once). Without boot_ladder the one rung is
+  # boot_retry_flags, as up to revision 16.
+  boot_ladder:
+    - {env: {ARC26_KV4: "0"}}
+    - {flags: {--kv-cache-dtype: bfloat16, --cuda-graph-backend-decode: disabled,
+               --cuda-graph-backend-prefill: disabled}}
+  boot_retry_flags: {--kv-cache-dtype: bfloat16, --cuda-graph-backend-decode: disabled,
+                     --cuda-graph-backend-prefill: disabled}
+  # Seconds for the first generation (template_check): the TileLang indexer and other kernels
+  # compile at first use on sm89 (revision 15: 1,800, was 900; in revision 13 the warm-up's
+  # torch inductor compile still ran after "Uvicorn running", with /health 503). A timeout here
+  # reboots with boot_retry_flags (BF16 KV, no graphs): a boot plus a slower decode for the
+  # whole rerun, so the wait is cheaper.
+  first_generation_timeout_s: 1800
+  # Seconds between health polls.
+  poll_s: 5
+  # The pulled engine.log is at most this size (head and tail kept); the pull warns at 50 MB.
+  max_log_bytes: 20000000
+  # Lines of engine_tail.log.
+  tail_lines: 400
+  # The stream's chunks carry only the new text and ids (the flag below): SGLang's default
+  # chunks repeat everything so far, which is quadratic over a 65,536-token reply.
+  incremental_stream: true
+  # The server's flags, in order. true: the bare flag; null or false: left out; a list: its
+  # items; a mapping: JSON. The recipe's first boot without MTP (R6,
+  # docs/research/flash_next_sglang.md on task/ideas), which maps dfranzen's launcher (cell 12,
+  # one RTX PRO 6000) to four 22.49 GiB sm89 GPUs; each comment gives the reason.
+  flags:
+    --model-path: "{model}"
+    --load-format: safetensors
+    # dfranzen's: the fork's loader in one thread per rank.
+    --model-loader-extra-config: {enable_multithread_load: false}
+    # The fork's checkpoint prefetch and page-cache drop after load (dfranzen's): host RAM is
+    # needed for the n-gram table.
+    --weight-loader-prefetch-checkpoints: true
+    --weight-loader-drop-cache-after-load: true
+    --served-model-name: flash-next-w4a16
+    --host: 127.0.0.1
+    --port: "{port}"
+    # TP 4 (task brief): the weights need all four GPUs.
+    --tensor-parallel-size: 4
+    # EP 4: at TP 4 alone each expert is 160 wide and AutoRound falls back from Marlin; EP keeps
+    # 640 and routes to the Marlin W4A16 MoE (sm80+). No DeepEP: all-reduce over PCIe (R6).
+    --expert-parallel-size: 4
+    --moe-a2a-backend: none
+    # No custom all-reduce: its IPC buffers between ranks are what the fork calls experimental on
+    # consumer PCIe ("TP>1 on this consumer-PCIe image is experimental and not yet
+    # hardware-qualified", engine.log of P5.2-04), and P5.2-04's first boot hung in the decode
+    # graph capture at TP 2 over PCIe. At TP 4 without NVLink the fork disables it by itself
+    # (custom_all_reduce_utils.can_use_custom_all_reduce_with_nvlink); at TP 2 with P2P it would
+    # run. NCCL does every all-reduce. The torch symmetric-memory and NVLS paths are opt-in and
+    # stay off (--enable-symm-mem, --enable-torch-symm-mem, --enable-nccl-nvls unset); the one
+    # multimem path that is on by default, the logits all-gather, is turned off by an edit below
+    # (patches, logits_gather_nccl).
+    --disable-custom-all-reduce: true
+    # L4 supports bf16; Intel's AutoRound W4A16 (dfranzen's; builder patch 3 fixes the Marlin
+    # scale dtype).
+    --dtype: bfloat16
+    --quantization: auto-round
+    --moe-runner-backend: auto
+    # --language-model-only is left out: the fork refuses it for this model during argument
+    # resolution, before any GPU work ("ValueError: --language-model-only does not support
+    # ['Qwen4ExpForConditionalGeneration']. Supported: ['MuseGlimmerForConditionalGeneration']",
+    # server_args.py:8496, _handle_language_model_only; Modal check P5.2-03, 29 Oct, both boots).
+    # The vision tower (0.836 GiB BF16, P5.2-00's model.json) loads, as in dfranzen's launcher,
+    # which never set the flag; the pool read at boot sizes the streams (planner).
+    # The 51.2 GB FP8 n-gram table in pinned host RAM at its exact size, 11.92 GiB per rank,
+    # 47.68 GiB of about 80.5 free (R6; P6.9-04's RAM).
+    --ple-offload-embedding: true
+    --trust-remote-code: true
+    # QSA layers get their own backend whatever this says; triton keeps the unused default small.
+    --attention-backend: triton
+    # FlashInfer's Gated DeltaNet kernels need sm90+ (gdn_flashinfer.py:122-124): Triton for every
+    # linear-attention and Mamba path; dfranzen's flashinfer values must not be copied.
+    --linear-attn-backend: triton
+    --linear-attn-decode-backend: triton
+    --linear-attn-prefill-backend: triton
+    --mamba-backend: triton
+    # FP8 E4M3 KV: 6,912 bytes per token per GPU against 13,056 in BF16, 1.9x the pool; needs the
+    # guarded edit below (patches), whose fallback is bfloat16.
+    --kv-cache-dtype: fp8_e4m3
+    # QSA forces page size 64, which needs extra_buffer (or no radix cache); the radix cache
+    # serves the forcing turn's prefix.
+    --page-size: 64
+    --mamba-ssm-dtype: bfloat16
+    --mamba-radix-cache-strategy: extra_buffer
+    --mamba-track-interval: 64
+    # Required: unset, SGLang gives Mamba 47% of the pool. The fork's floor is 5 slots per
+    # request for extra_buffer with the overlap scheduler (kv_cache_configurator.py:1919-1949),
+    # plus revision 14's spare of 4 for radix-cached states: 5 x 3 + 4 = 19 for the 3 requests
+    # below (revision 15, docs/research/fn_l4_memory.md on task/ideas, 3d82150; revision 14: 24,
+    # revisions up to 13: 44). A slot is 13.70 MiB per GPU, 2,128 FP8 tokens (the note, checked
+    # against the revision 13 smoke's 0.59 + 0.02 GB for 45 allocated).
+    # Revision 20: 29 = 5 x 5 + 4 for the 5 requests below (revision 17: 24 for 4; revisions 15
+    # and 16: 19 for 3). Each slot is 14,708,736 B per GPU: 2,128 FP8 tokens, 3,482 KV4 tokens
+    # (4,224 B each); the slots come out of the static pool, not the slack.
+    # Revision 21: 30 = 5 x 6, the fork's floor for the 6 server slots below with no spare. The
+    # wheel caps max_running_requests at max_mamba_cache_size // 5 (resolve_max_num_reqs and
+    # _calculate_mamba_ratio: base 3 plus 2 for extra_buffer's ping-pong with the overlap
+    # scheduler, no skip lock), so 30 still gives 6. Slots are taken per request at admission
+    # (HybridReqToTokenPool.alloc), not reserved per server slot, and radix-cached states sit in
+    # any free slot and are evicted on demand (alloc_req_slots, PrefillAdder's rem_mamba_slots
+    # counts them as available): no slot is dedicated to the cache. Version 16 used 4 slots per
+    # running request (engine.log "mamba num" 4, 8, 12, 16, 20 at 1 to 5 running; 20 of 29 at
+    # most), so 5 streams leave 10 of 30 for cached states and headroom, against version 16's 9
+    # of 29. One more slot than revision 20: 3,482 KV4 tokens (2,128 FP8) out of the pool.
+    --max-mamba-cache-size: 30
+    # Revision 15: 0.95 (revision 14: 0.94, revisions up to 13: 0.92). The fork takes the slack
+    # (1 - f) from the 21.62 GiB free before the load, not from the card's 22.49
+    # (kv_cache_configurator.py:1870-1917, the note), so each 0.01 is 0.216 GiB, 33,585 FP8
+    # tokens per GPU, and revision 14's pool is about 125,504, not 128k. The revision 13 smoke at
+    # 0.92: weights 19.06 GiB per GPU, 2.55 left, the decode capture 0.35 GiB, 1.56 GiB free
+    # after it. At 0.95 with graphs to batch 3 (about 0.30 GiB, estimate) about 0.96 GiB stays
+    # free after capture against a prefill peak of about 0.45 GiB at the 2,048-token chunk below
+    # (the indexer's FP32 logits and the Marlin MoE caches), about 0.5 GiB of margin (revision
+    # 14: about 0.38 at 4,096). The pool (estimate): 169,728 FP8 tokens (3 streams at 56,576),
+    # 89,856 on the BF16 fallback. No activation peak has been measured on the L4.
+    --mem-fraction-static: 0.95
+    # Version 9's request bound 82,547 (6,771 opening + 69,632 + 6,144), rounded up to 84 x 1,024;
+    # this run's 65,536 cap and the tool replies fit inside (the tool loop's context bound).
+    --context-length: 86016
+    # Revision 15: 3 (revision 14: 4, revisions up to 13: 8): the streams the estimated 169,728
+    # pool holds at the planner's floor (a 4th needs about 220k); the Mamba slots above are sized
+    # for 3.
+    # Revision 20: 5 (revision 17: 4; revisions 15 and 16: 3). Version 14 is limited by bandwidth
+    # and the pool, not the all-reduce: decode medians 44.6, 81.0, 110.8 tokens per second at
+    # batch 1, 2, 3, so a step grows about 2.35 ms per extra stream (estimates about 136 in all at
+    # 4, about 157 at 5; docs/research/fn_decode_speed.md on task/ideas, f270a86), and with the
+    # cap at 49,152 a 5th stream costs almost no per-task budget. Version 14 measured a pool of
+    # 170,176 FP8 tokens with 19 Mamba slots. With KV4 about 277,696 - 10 x 3,482 = 242,876
+    # (estimate): 5 streams at about 48,575 (thinking about 35,400, above the floor's 42,168 per
+    # stream; the context binds just under the cap). On the FP8 fallback (rung 1)
+    # 170,176 - 10 x 2,128 = 148,896: 3 streams at about 49,632 (4 would think about 24k, under
+    # the floor), which the planner picks by itself.
+    # Revision 21: 6, one more than the client's 5 streams (solve.max_streams). The scheduler's
+    # batch_is_full latch counts a request in chunked prefill twice, so at a limit equal to the
+    # streams the 5th was held until another request ended (version 16: 398 s after the 4th;
+    # docs/research/fn_many_streams.md section 3.4 on task/ideas). The client never sends a 6th,
+    # so the spare slot only absorbs the double count. Pool (estimate): 242,876 - 3,482 =
+    # 239,394 KV4 tokens with the 30 Mamba slots above (version 16 measured 243,712 at 29, so
+    # about 240,230): 5 streams at about 47,878. The FP8 fallback 148,896 - 2,128 = 146,768: 3
+    # streams at about 48,922.
+    --max-running-requests: 6
+    # Revision 15: 2,048 (was 4,096). The two large prefill buffers scale with the chunk: the
+    # indexer's FP32 logits (0.35 GiB at 4,096 rows and 86k) and the Marlin MoE caches (0.37 GiB
+    # at 4,096), so the peak is about 0.45 GiB instead of 0.8 (the note's headroom model), which
+    # pays for the 0.01 of the fraction above; a prefill is a few percent slower.
+    --chunked-prefill-size: 2048
+    --max-prefill-tokens: 8192
+    # The fork's decode graph sizes, up to the request limit (revision 15: 3; revision 14: 4;
+    # revisions up to 13: 8, whose capture took 439 s in the revision 13 smoke). Graphs above the
+    # limit are never replayed.
+    # Revision 20: batches 1 to 5, for the 5 requests (revision 17: 1 to 4; revisions 15 and 16:
+    # 1 to 3). Revision 21 keeps 1 to 5: the client runs at most 5 (solve.max_streams), and a
+    # graph for 6 would cost capture memory for a batch that never decodes.
+    --cuda-graph-max-bs-decode: 5
+    --cuda-graph-bs-decode: [1, 2, 3, 4, 5]
+    --chat-template: "{chat_template}"
+    # Only for the chat endpoint of the template check; /generate is raw.
+    --reasoning-parser: qwen3
+    --default-chat-template-kwargs: {preserve_thinking: true}
+    # The longest-prefix-match policy keeps a forcing turn next to its cached reply (dfranzen's).
+    --schedule-policy: lpm
+    # Half an hour: a 60k prefill or a long compile must not trip the watchdog.
+    --watchdog-timeout: 1800
+    # cached_tokens in every reply (the forcing turn's prefix hit) and /metrics for the monitor.
+    --enable-metrics: true
+    --enable-cache-report: true
+    # Chunks with only the new tokens, every 16 tokens: a 65,536-token reply is 4,096 small
+    # chunks instead of 65,536 that each repeat the reply so far. P5.2-00's server_help step
+    # checks that the fork has both flags.
+    --incremental-streaming-output: true
+    --stream-interval: 16
+  # Environment of the server (and of the argument check): dfranzen's cell 12 values with the
+  # recipe's changes (R5).
+  env:
+    PYTORCH_CUDA_ALLOC_CONF: expandable_segments:True
+    # torch extension builds for the L4 (dfranzen sets 12.0 for the RTX PRO 6000); SGLang's own
+    # JIT targets the detected sm_89.
+    TORCH_CUDA_ARCH_LIST: "8.9"
+    # FlashInfer JIT for modules missing from its jit-cache.
+    FLASHINFER_CUDA_ARCH_LIST: "8.9"
+    SGLANG_ALLOW_OVERWRITE_LONGER_CONTEXT_LEN: "1"
+    # sm120-only switches, inert on sm89; off anyway.
+    SGLANG_ENABLE_SM120_LOWM_BF16_GEMM: "0"
+    SGLANG_SM120_ONLINE_MXFP8: "0"
+    SGLANG_SM120_LOWM_FP8_WEIGHT: "0"
+    SGLANG_SM120_LM_HEAD_FP8: "0"
+    # The ARChitects' prefix-retention patch 4 (builder defaults).
+    SGLANG_MAMBA_PREFILL_FINAL_ONLY: "1"
+    SGLANG_MAMBA_REFRESH_ON_UNLOCK: "1"
+    SGLANG_MAMBA_CONV_DTYPE: bfloat16
+    SGLANG_NUMA_BIND_V2: "false"
+    SGLANG_MM_PREPROCESS_DEVICE: cpu
+    OMP_NUM_THREADS: "8"
+    TOKENIZERS_PARALLELISM: "false"
+    HF_HUB_OFFLINE: "1"
+    TRANSFORMERS_OFFLINE: "1"
+    HF_DATASETS_OFFLINE: "1"
+    MAX_JOBS: "8"
+    FLASHINFER_NVCC_THREADS: "2"
+    # NCCL prints whether the GPUs talk by P2P or shared memory (P6.9-01: SHM, P2P on every pair).
+    NCCL_DEBUG: INFO
+    # Revision 17, the KV4 cache of task P5.5 (configs/P5.5-01.yaml, docs/runbooks/fn_kvq.md):
+    # "1" packs QSA's K and V as INT4 (the patched pool class and gathers, fn_kvq); "0" is
+    # revision 16's FP8 path byte for byte (fn_kvq never imported). The boot ladder and a failed
+    # KV4 edit set it to "0" (engine.boot_ladder, patches fallback_env).
+    ARC26_KV4: "1"
+    # The 64-point block Hadamard rotation on write, undone in the gather (the methods note).
+    ARC26_KV4_HADAMARD: "1"
+    # Channels per FP16 scale: 144 bytes per packed row.
+    ARC26_KV4_GROUP: "32"
+    # fn_kvq for the patched engine: the code dataset's fn_kvq.pyz, a zip archive named so that
+    # Kaggle keeps it as one file (revision 18: Kaggle extracted revision 17's fn_kvq.zip), on
+    # the server's sys.path (zipimport; scripts/build_fn_notebooks.py DATASET_ZIPS). "{code}" is the code dataset's
+    # folder as found (stage_cuda): Kaggle mounted revision 15's at /kaggle/input/arc26-code-fn
+    # (revision 17's slug arc26-code-fn-kv4 mounts the same way), not the
+    # configured path (revision 15's inputs.json). An import failure fails the KV4 boot, and the
+    # ladder's next rung boots without KV4.
+    PYTHONPATH: "{code}/fn_kvq.pyz"
+  # Revision 22: the engine's own free device memory while serving, logged whenever a kernel
+  # loads after serving started (fn_probe.free_device_min; state.json monitor.free_device).
+  free_pattern: "free device mem: ([\\d.]+) GiB"
+  # Numbers read from the server log (first group; one match per rank is usual).
+  log_patterns:
+    max_total_num_tokens: "max_total_num_tokens=(\\d+)"
+    max_running_requests: "max_running_requests=(\\d+)"
+    context_len: "context_len=(\\d+)"
+    available_gpu_mem_gb: "available_gpu_mem=([\\d.]+)"
+    kv_cache_tokens: "KV Cache is allocated\\. #tokens: (\\d+)"
+    k_size_gb: "K size: ([\\d.]+) GB"
+    weight_mem_gb: "Load weight end\\..*?mem usage=([\\d.]+) GB"
+    cuda_graph_s: "Capture cuda graph end\\. Time elapsed: ([\\d.]+) s"
+    cuda_graph_mem_gb: "Capture cuda graph end\\..*?mem usage=([\\d.]+) GB"
+    mamba_cache_size: "max_mamba_cache_size: (\\d+)"
+    # Recipe R9: the n-gram table's pinned size and any cap on the request limit.
+    ple_pinned_gib: "(?i)ple[^\\n]*?([\\d.]+) ?GiB"
+    running_capped: "max_running_requests is capped[^\\n]*?(\\d+)"
+
+# The recipe's one edit (R4), applied after the install: with FP8 KV the fork sizes FA2's packed
+# decode scratch in the pool's dtype, which FA2 refuses; the scratch takes the query's dtype
+# (upstream #38851). Hash-guarded and exact-once; if it does not apply, the fallback flags run the
+# boot with BF16 KV (about half the pool) instead. P5.2-00 checks the match and saves its context.
+patches:
+  # The KV4 group's first edit (revision 20): before it, fn_probe.apply_patches copies every file
+  # the group edits as revision 16's five edits left it; a failed KV4 edit, a failed import
+  # check, or the ladder's KV4-off rung writes those copies back (fn_probe.restore_kv4), so the
+  # engine is revision 16's byte for byte, and sets ARC26_KV4=0.
+  kv4_from: kv4_backend_scratch_dim
+  items:
+    - name: fa2_scratch_dtype
+      file: sglang/srt/layers/attention/qwen_sparse_attn_backend.py
+      # The file at the fork's d00d88e (recipe R4).
+      sha256_before: 2ce24d66d6a0bff0e22ff0819291649a4169937f32c5c28241215c6eb119ad54
+      # After it (revision 17, configs/P5.5-01.yaml): the KV4 edits below chain on this hash.
+      sha256_after: acd14f247ad36cc35540a592dc00ed809a671a36cb5b47654b89ac1ed98f1209
+      pattern: "(scratch_capacity,\\s*k_buffer\\.shape\\[1\\],\\s*k_buffer\\.shape\\[2\\],\\s*)k_buffer\\.dtype,"
+      replacement: "\\g<1>q.dtype,"
+      count: 1
+      fallback_flags: {--kv-cache-dtype: bfloat16}
+    # The logits all-gather through NCCL, not torch symmetric memory: the fork's
+    # LogitsProcessor builds a MultimemAllGatherer (distributed/device_communicators/
+    # triton_symm_mem_ag.py) whenever TP > 1, with no flag or variable to turn it off; its first
+    # eager call rendezvous over the store for a CUDA multicast buffer. In P5.2-04 (TP 2 on PCIe,
+    # no multicast) that rendezvous waited 600 s ("multimem all-gather disabled (wait timeout
+    # after 600000ms, keys: /default_pg/0//3//CUDASymmetricMemory/...)") inside the decode graph
+    # capture, and the server never became healthy. With enabled False the gatherer calls
+    # tensor_model_parallel_all_gather (NCCL) every time, as the fork does without TP. Kaggle's
+    # 4 x L4 is PCIe too. Hashes: the file at the fork's d00d88e, equal to the wheelhouse's
+    # sglang wheel (read 30 Oct). No fallback flag exists: if the edit does not apply, the boot
+    # runs as P5.2-04's did and patches.json says so.
+    - name: logits_gather_nccl
+      file: sglang/srt/layers/logits_processor.py
+      sha256_before: 96e9d0a403b5301b1fac17206819c262b22ac8fb3a3e1719c1bfcc0df4053574
+      sha256_after: ec4fb9517065c9ecc739f3c3fd92717d0a3375f994eec83f67eb32ca6a413ea8
+      pattern: "enabled=self\\.do_tensor_parallel_all_gather and not self\\.use_attn_tp_group,"
+      replacement: "enabled=False,"
+      count: 1
+      fallback_flags: {}
+    # The Marlin MoE's top-k sum in torch, not sgl_kernel's moe_sum_reduce: P5.2-04's fallback
+    # boot died on its first forward with "RuntimeError: moe_sum_reduce CUDA kernel (small-token)
+    # launch failed" (sgl_kernel/moe.py:90, from fused_marlin_moe.py:423, marlin.py:174,
+    # gptq_moe.py:336). vLLM's Marlin MoE sums the same [M, topk, K] tensor with
+    # torch.sum(..., dim=1, out=output); the scale multiplies only when it is not 1.0. The CUDA
+    # check after that kernel reads cudaGetLastError, so the fault may be an earlier launch's:
+    # torch's own launch check then names the CUDA error instead of this message. No fallback
+    # flag: --moe-runner-backend triton reaches the same moe_sum_reduce
+    # (moe_runner/triton_utils/fused_moe.py:878 and 907).
+    - name: marlin_moe_torch_sum
+      file: sglang/srt/layers/moe/fused_moe_triton/fused_marlin_moe.py
+      sha256_before: fab293ee5aaa0d285d161c3bbf23606d2908fe3273eae5f32eb5b49db52f81e4
+      sha256_after: 971eda94081f6bd637af0764623d97beaecd8bc2df9b1cdc1be049400d3f1e44
+      pattern: "(?m)^( *)moe_sum_reduce\\(\\n *intermediate_cache3,\\n *output,\\n *routed_scaling_factor,\\n *\\)$"
+      replacement: "\\g<1>torch.sum(intermediate_cache3, dim=1, out=output)\\n\\g<1>if routed_scaling_factor != 1.0:\\n\\g<1>    output.mul_(routed_scaling_factor)"
+      count: 1
+      fallback_flags: {}
+    # The Marlin MoE told that EP is on (fix round H, after Modal P5.2-05 and P5.2-06; research note
+    # docs/research/fn_sm89_illegal_access.md on task/ideas, b2a5a9e). At EP > 1 the dispatcher
+    # rewrites the top-k ids to local ids with -1 for the other ranks' experts
+    # (token_dispatcher/standard.py:186-237), but the GPTQ Marlin MoE call passes no expert_map
+    # (gptq_kernels.py:369-382), so fused_marlin_moe runs the kernel with is_ep off
+    # (fused_marlin_moe.py:323,386) and the kernel reads expert -1 as a real one, below the weight
+    # tensors (marlin_template.h:537-552): P5.2-05's "illegal memory access" in both boots, at TP
+    # 2 + EP 2 and, by the same code, at Kaggle's TP 4 + EP 4. Two anchored replacements in
+    # moe_runner/marlin.py, each exact-once, the second's sha256_before the first's sha256_after:
+    # the import of the dispatcher's own accessor (standard.py:34) beside the function's imports
+    # (line 123), and line 184's expert_map, empty whenever none is passed and moe_ep_size > 1;
+    # fused_marlin_moe only tests it for None (lines 249, 323, 365, 386), so is_ep turns on (the
+    # kernel skips the -1 blocks), intermediate_cache3 is zeroed before GEMM 2, and EP stays off
+    # the single-token shortcut. At EP 1 the call is unchanged. Hashes: the file at the fork's
+    # d00d88e, equal to the wheelhouse's (P5.2-06 applied both, 30 Oct, patches in its bisect.json);
+    # in P5.2-06 the eager boot with the edit reached "Uvicorn running" and its warm-up compiles
+    # with no fault, where P5.2-05's died 17 s after it. Applied at the install, so both boots
+    # carry it. Fallback if either does not apply: EP 1 (AutoRound then falls back to the Triton
+    # MoeWNA16 MoE, which honours no -1 id; the same weight bytes per GPU), never EP > 1 without it.
+    - name: marlin_ep_mask_import
+      file: sglang/srt/layers/moe/moe_runner/marlin.py
+      sha256_before: e1db2b78559fd7ed482710f0b95104339ebcd41721a3cb85e17fbc63ab683734
+      sha256_after: 09110ecb55c308d357886f90e2068535c971c3892de0099861d74b7e3e48150b
+      pattern: "(?m)^(    from sglang\\.srt\\.layers\\.quantization\\.marlin_utils import marlin_make_workspace\\n)"
+      replacement: "\\g<1>    from sglang.srt.runtime_context import get_parallel\\n"
+      count: 1
+      fallback_flags: {--expert-parallel-size: 1}
+    - name: marlin_ep_mask_map
+      file: sglang/srt/layers/moe/moe_runner/marlin.py
+      sha256_before: 09110ecb55c308d357886f90e2068535c971c3892de0099861d74b7e3e48150b
+      sha256_after: 86c0031252e00deebdedc25db8b8c8f1939ea6bcc858d04992ecb111e3640ae2
+      pattern: "(?m)^(        )expert_map=quant_info\\.expert_map,$"
+      replacement: "\\g<1>expert_map=(quant_info.expert_map if quant_info.expert_map is not None or get_parallel().moe_ep_size == 1 else topk_output.topk_ids.new_empty(0)),"
+      count: 1
+      fallback_flags: {--expert-parallel-size: 1}
+    # The 4-bit KV cache of task P5.5 (revision 17; docs/tasks/P5.5.md, scripts/fn_kvq/,
+    # docs/runbooks/fn_kvq.md; the edits are configs/P5.5-01.yaml's, chained on the fork's
+    # d00d88e files after the five above and tested against the clone, tests/test_fn_kvq.py).
+    # QSA's K and V become INT4 with FP16 scales per 32 channels and a 64-point Hadamard
+    # rotation: 4,224 bytes per token per GPU against FP8's 6,912, so revision 15's estimated
+    # 169,728-token pool becomes about 277,696 (1.64x, estimate). The edits are inert unless
+    # ARC26_KV4 is on (engine.env); a KV4 edit that does not apply turns ARC26_KV4 off for every
+    # boot (fallback_env, fn_probe.apply_patches), so the run takes revision 16's FP8 path instead
+    # of stopping. --kv-cache-dtype fp8_e4m3 stays: the variable selects the packed pool class.
+    # KV4, the backend (qwen_sparse_attn_backend.py, after fa2_scratch_dtype). Four edits, in this
+    # order: the call sites first, the module-level helpers last (the helpers mention the fork's
+    # gather by name, which would make the rename's count 3).
+    # 1. The FA2 scratch's head dim from the layer, not from the pool buffer: a packed row is 144
+    #    bytes, the FP8 one 256 (the map note's fact 3). layer.head_dim is 256 in every mode.
+    - name: kv4_backend_scratch_dim
+      file: sglang/srt/layers/attention/qwen_sparse_attn_backend.py
+      sha256_before: acd14f247ad36cc35540a592dc00ed809a671a36cb5b47654b89ac1ed98f1209
+      sha256_after: aa7eab3b259f0b9761a9025676a300e0448d913bfb4b0c9484fef59b2f28d419
+      pattern: "(k_buffer\\.shape\\[1\\],\\s*)k_buffer\\.shape\\[2\\],(\\s*q\\.dtype,)"
+      replacement: "\\g<1>layer.head_dim,\\g<2>"
+      count: 1
+      fallback_flags: {}
+      fallback_env: {ARC26_KV4: "0"}
+    # 2. Both decode gathers (the FA2 path and the TRT-LLM one, which never runs on sm89) through
+    #    the shim: packed buffers go to fn_kvq's dequant gather, others to the fork's kernel.
+    - name: kv4_backend_extract
+      file: sglang/srt/layers/attention/qwen_sparse_attn_backend.py
+      sha256_before: aa7eab3b259f0b9761a9025676a300e0448d913bfb4b0c9484fef59b2f28d419
+      sha256_after: a597b04aa7abfb65239c65d216493b18e7c2190a780fdc954b20d3c7136f9f2b
+      pattern: "qwen_sparse_kv_extraction_compact_triton\\("
+      replacement: "_arc26_kv_extract("
+      count: 2
+      fallback_flags: {}
+      fallback_env: {ARC26_KV4: "0"}
+    # 3. The chunked-prefill staging of a request's whole context (the map note's fact 1): a
+    #    dequantized BF16 copy in place of the FP8 index_select (88 MB per layer call at 86k
+    #    tokens against 44 MB today, transient).
+    - name: kv4_backend_extend_gather
+      file: sglang/srt/layers/attention/qwen_sparse_attn_backend.py
+      sha256_before: a597b04aa7abfb65239c65d216493b18e7c2190a780fdc954b20d3c7136f9f2b
+      sha256_after: 333e144136674f7433016e7a258e3d0a4fc9ca4d9b2977cac3802ebfb930ec1a
+      pattern: "k_buffer\\.index_select\\(0, gather_index\\),\\s*v_buffer\\.index_select\\(0, gather_index\\),"
+      replacement: "*_arc26_kv_gather(k_buffer, v_buffer, gather_index, q.dtype),"
+      count: 1
+      fallback_flags: {}
+      fallback_env: {ARC26_KV4: "0"}
+    # 4. The two shims, before the metadata class, gated on ARC26_KV4 read once at import: off,
+    #    each shim is the fork's own call whatever the buffers' dtype (the FP8 pool stores uint8
+    #    and hands the backend a float8 view, but no dtype test is relied on); on, a packed
+    #    (uint8) buffer is the KV4 pool's. fn_kvq is imported only on that path.
+    - name: kv4_backend_helpers
+      file: sglang/srt/layers/attention/qwen_sparse_attn_backend.py
+      sha256_before: 333e144136674f7433016e7a258e3d0a4fc9ca4d9b2977cac3802ebfb930ec1a
+      sha256_after: 35516a7114a70842bc6198d9ab9d504c90d5eac285e5005dd18122603ab827d1
+      pattern: "(?m)^class QwenSparseAttnMetadata\\(msgspec\\.Struct, frozen=True\\):$"
+      replacement: |-
+        import os as _arc26_os
+
+        # arc26 P5.5: the switch, read once at import; off, the shims below are the fork's own calls.
+        _ARC26_KV4 = _arc26_os.environ.get("ARC26_KV4", "0").strip().lower() not in ("", "0", "off", "false")
+
+
+        def _arc26_kv_extract(k, v, *args):
+            # arc26 P5.5: with the switch on, a packed (uint8) buffer is the KV4 pool's.
+            if not _ARC26_KV4 or (k.dtype != torch.uint8 and v.dtype != torch.uint8):
+                return qwen_sparse_kv_extraction_compact_triton(k, v, *args)
+            from fn_kvq.sglang_kv4 import kv_extract_compact
+
+            return kv_extract_compact(k, v, *args)
+
+
+        def _arc26_kv_gather(k, v, index, dtype):
+            # arc26 P5.5: the chunked-prefill staging, dequantized for the KV4 pool's packed buffers.
+            if not _ARC26_KV4 or (k.dtype != torch.uint8 and v.dtype != torch.uint8):
+                return k.index_select(0, index), v.index_select(0, index)
+            from fn_kvq.sglang_kv4 import kv_gather_rows
+
+            return kv_gather_rows(k, v, index, dtype)
+
+
+        class QwenSparseAttnMetadata(msgspec.Struct, frozen=True):
+      count: 1
+      fallback_flags: {}
+      fallback_env: {ARC26_KV4: "0"}
+
+    # KV4, the pool class (kv_cache_configurator.py): the QSA pool's full-attention sub-pool is
+    # fn_kvq.sglang_kv4.KV4MHATokenToKVPool when ARC26_KV4 is on (the map note's candidate 1c).
+    # The anchor is the hybrid-linear site (the SWA site has other neighbours). Hashes: the
+    # wheel's file (pennyroyal-v253's sglang-0.5.19+gd00d88efc8d6, runs/wheel-peek, 1751fd54...),
+    # which differs from the clone's d00d88e (a759ae97...) in its no_intermediate_ssm lines
+    # 2112 to 2195 only; the Kaggle CPU twin of revision 18 refused the clone's hash.
+    - name: kv4_pool_class_helper
+      file: sglang/srt/mem_cache/kv_cache_configurator.py
+      sha256_before: 1751fd5464932ce1eadbdca19f069bbdc354b429432b43aabfc3e1fcb776dae7
+      sha256_after: 4c37252d943a57dfd6cf31162c730a2337298f48245a7425fa93e1f27f3185b7
+      # Anchored above the class's decorator (revision 20): revision 19 anchored on the class line
+      # and put the helper between @dataclass(slots=True, kw_only=True) and the class, so the
+      # decorator wrapped the helper and the module failed to import ("'function' object has no
+      # attribute '__mro__'", version 15 on Kaggle) whatever ARC26_KV4 was.
+      pattern: "(?m)^@dataclass\\(slots=True, kw_only=True\\)\\nclass KVCacheConfigurator:$"
+      replacement: |-
+        def _arc26_kv4_pool_class(default):
+            # arc26 P5.5: ARC26_KV4=1 (or kv, v) swaps the QSA layers' MHA pool for the packed INT4 one.
+            import os
+
+            if os.environ.get("ARC26_KV4", "0").strip().lower() in ("", "0", "off", "false"):
+                return default
+            from fn_kvq.sglang_kv4 import KV4MHATokenToKVPool
+
+            return KV4MHATokenToKVPool
+
+
+        @dataclass(slots=True, kw_only=True)
+        class KVCacheConfigurator:
+      count: 1
+      fallback_flags: {}
+      fallback_env: {ARC26_KV4: "0"}
+    - name: kv4_pool_class
+      file: sglang/srt/mem_cache/kv_cache_configurator.py
+      sha256_before: 4c37252d943a57dfd6cf31162c730a2337298f48245a7425fa93e1f27f3185b7
+      sha256_after: 909547275e10a1a695da6bf0409c7295f3f2b38080b66888192c1d03175aeddb
+      pattern: "(?m)^(            )full_kv_pool_class=full_pool_class,\\n            quant_method=quant_method,\\n            post_capture_active=self\\.post_capture_kv_active and quant_method is None,$"
+      replacement: "\\g<1>full_kv_pool_class=_arc26_kv4_pool_class(full_pool_class),\\n\\g<1>quant_method=quant_method,\\n\\g<1>post_capture_active=self.post_capture_kv_active and quant_method is None,"
+      count: 1
+      fallback_flags: {}
+      fallback_env: {ARC26_KV4: "0"}
+
+    # KV4, the byte accounting (pool_configurator.py): the full-attention term of the cell size
+    # prices the packed rows, so max_total_num_tokens grows to the pool the bytes allow.
+    - name: kv4_cell_size_helper
+      file: sglang/srt/model_executor/pool_configurator.py
+      sha256_before: 1552a9d70a042c189902e695f56f015bfc1c360cb6f9cbbee4b7815fa2ad94db
+      sha256_after: 7ba61d3c769870df1e6097e8791fa770c9f2193b36f8236d6eb75254b33c8a67
+      pattern: "(?m)^def _dflash_draft_cell_size\\(kvc: KVCacheConfigurator\\) -> int:$"
+      replacement: |-
+        def _arc26_kv4_cell_size(n, head_dim, v_head_dim, layers, kv_size):
+            # arc26 P5.5: the packed INT4 rows' bytes when ARC26_KV4 is on (fn_kvq.layout).
+            import os
+
+            if os.environ.get("ARC26_KV4", "0").strip().lower() in ("", "0", "off", "false"):
+                return n * (head_dim + v_head_dim) * layers * kv_size
+            from fn_kvq.sglang_kv4 import kv4_cell_size
+
+            return kv4_cell_size(n, head_dim, v_head_dim, layers, kv_size)
+
+
+        def _dflash_draft_cell_size(kvc: KVCacheConfigurator) -> int:
+      count: 1
+      fallback_flags: {}
+      fallback_env: {ARC26_KV4: "0"}
+    - name: kv4_cell_size
+      file: sglang/srt/model_executor/pool_configurator.py
+      sha256_before: 7ba61d3c769870df1e6097e8791fa770c9f2193b36f8236d6eb75254b33c8a67
+      sha256_after: 3d0af1bd767d0ec88f7ea8bd9264eba02e2b3a13d645602ce9862da2adf7a13e
+      pattern: "(?m)^            cell_size = \\(\\n                n\\n                \\* \\(model_config\\.head_dim \\+ model_config\\.v_head_dim\\)\\n                \\* effective_num_layers\\n                \\* kv_size\\n            \\)$"
+      replacement: "            cell_size = _arc26_kv4_cell_size(n, model_config.head_dim, model_config.v_head_dim, effective_num_layers, kv_size)"
+      count: 1
+      fallback_flags: {}
+      fallback_env: {ARC26_KV4: "0"}
+
+    # KV4, the hybrid pool's value head dim (memory_pool.py): it reads the V buffer's last dim,
+    # 144 for a packed row; the Triton backend built for the linear layers sizes its unused
+    # graph buffers from it (triton_backend.py:247, 834, 1027). The MHA pool knows its
+    # v_head_dim (256) in every mode.
+    - name: kv4_hybrid_v_head_dim
+      file: sglang/srt/mem_cache/memory_pool.py
+      sha256_before: 69f7c90f53c58317fd25cd5c15d85cc425de5f6e8c028a55a40c0f62432a2e84
+      sha256_after: 61ca47f543fc14bf93a2d434ab7a5c9e7ab135d18b48bbd8b4847e5067c5135a
+      pattern: "(?m)^(        )return self\\.full_kv_pool\\.get_value_buffer\\(self\\.full_kv_pool\\.start_layer\\)\\.shape\\[\\n            -1\\n        \\]$"
+      replacement: "\\g<1>if getattr(self.full_kv_pool, \"v_head_dim\", None):\\n\\g<1>    return self.full_kv_pool.v_head_dim\\n\\g<1>return self.full_kv_pool.get_value_buffer(self.full_kv_pool.start_layer).shape[-1]"
+      count: 1
+      fallback_flags: {}
+      fallback_env: {ARC26_KV4: "0"}
+
+# The sampler of GPU memory, RAM, and the server's gauges.
+monitor:
+  # Seconds; P6.9-01's server metrics were sampled every 5 s.
+  interval_s: 5
+  # Gauges of /metrics (without the sglang: prefix).
+  metrics: [num_running_reqs, num_queue_reqs, token_usage, gen_throughput, cache_hit_rate,
+            num_used_tokens]
+
+# The model's tokenizer and chat template through transformers in the venv.
+tokenizer: hf
+
+# The chat template's variables: P6.9-01's effort, xhigh (the organizers' 42.4% point).
+template:
+  kwargs: {reasoning_effort: xhigh}
+
+# The model's sampling for thinking (generation_config.json: temperature 1.0, top-p 0.95,
+# top-k 20; the research note, 2.1: same as the 27B's).
+sampling:
+  temperature: 1.0
+  top_p: 0.95
+  top_k: 20
+
+# The solve: version 10's request (cap 65,536, xhigh, direct_two, the forcing turn) on Flash-Next,
+# plain (arm A) or with the python tool (arm B, arc26.agent.toolshot).
+solve:
+  # Competition mode's one arm: the tool loop, the harness note's recommendation; plain when the
+  # sandbox fails its self-test at startup (tool_self_test).
+  arm: tool
+  # Development mode's pair, on the same server with the streams split evenly: arm A plain, arm
+  # B tool (the harness note's DEV measurement).
+  # Development mode's arms. Revision 16: [tool], competition's arm, so all 3 streams run the arm
+  # that is scored (revisions 10 to 12, 14, 15: [plain, tool]; revision 13: [plain]). Competition
+  # reads solve.arm, never this.
+  dev_arms: [tool]
+  # The challenges file of each mode.
+  challenges:
+    competition: arc-agi_test_challenges.json
+    development: arc-agi_evaluation_challenges.json
+  # Development mode's tasks: P6.9-01's 15 DEV120 tasks in its order (configs/P6.9-01.yaml,
+  # direct.task_ids). Competition mode takes every task, smallest opening first.
+  # Revision 16: P6.9-01's 15 again, in revision 10's order (revisions 11 to 15: [97d7923e]).
+  task_ids: [97d7923e, 247ef758, 7b3084d4, 898e7135, 142ca369, 88e364bc, a25697e4, a395ee82,
+             b5ca7ac4, b0039139, e8686506, 7ed72f31, 6e453dd6, 1818057f, 7c66cb00]
+  # Up to two answers per test input, best first (pass@2; P6.9-01's prompt).
+  system: direct_two
+  # The largest generated-token cap per task, C_max. A task's cap is min(C_max, c - opening -
+  # margin) at the planner's context c, the same in both arms; thinking stops forcing_tokens
+  # (6,144) short of it and the forced reply takes the rest. Revision 20: 49,152 (was version
+  # 10's 65,536, configs/agent_shot_P5.1.yaml waves.max_cap). Version 14's "65k" was really about
+  # 45k: its forced tasks hit the 56,725 context at 39k to 47k generated tokens, used 64% of the
+  # tokens for 21% of the points, and a true 65k would lose about 6 points; 4 streams with KV4
+  # and this cap gain about +3.5 [-0.8, +7.2] points, an estimate that depends on the unmeasured
+  # 4-stream rate (docs/experiments/P5.2-01-r16-budget.md on task/P5.2, b54410b). At the KV4
+  # plan (5 streams at about 48,575) the context binds just under this cap; on the FP8 fallback
+  # (3 at about 49,632) the context binds for every opening above 352 tokens.
+  cap: 49152
+  # The server's --context-length: a request never holds more. With the floor below and at most 3
+  # streams, the planner's c = floor(P / s) reaches it only for P >= 3 x 86,016 = 258,048, far
+  # above 4 x L4's pools (estimate 169,728), so on Kaggle it is only the engine's upper bound.
+  context_tokens: 86016
+  # Every request keeps input plus max_new this far under the context (SGLang refuses a request
+  # at the context length without --allow-auto-truncate; the refusal is an error chunk).
+  context_margin_tokens: 128
+  # The forcing turn's cap: P6.9-01's forcing_tokens (two answers for each of two 30 x 30
+  # outputs).
+  forcing_tokens: 6144
+  # P6.9-01's thinking_end_note, asking for both blocks: in P5.1-01 both forced replies wrote
+  # one block per output, so attempt 2 stayed [[0]] (docs/experiments/P5.1-01.md, b23b163).
+  thinking_end_note: "\n\nI have used my whole thinking budget, so I stop reasoning here and write my two final answer blocks for each test input now, two different grids, best first.\n"
+  # The tag the template closes reasoning with.
+  forcing_suffix: "</think>\n\n"
+  # P6.9-01's lenient parser (option 4b) and its first-attempt rule.
+  lenient_answers: true
+  # End-of-turn tokens the raw /generate text keeps (skip_special_tokens off, so </think> is
+  # seen); removed before the answer blocks are read, since a fence must end its line.
+  strip_tokens: ["<|im_end|>", "<|endoftext|>"]
+  # The most streams: the server's --max-running-requests, 3 since revision 15 (revision 14: 4,
+  # earlier: 8); the planner chooses at or below it.
+  # Revision 20: 5, the server's limit (revision 17: 4; revisions 15 and 16: 3).
+  # Revision 21: 5, one below the server's 6 (the N+1 admission fix above); the planner takes
+  # the smaller of the two.
+  max_streams: 5
+  # Linear-attention state per stream, in tokens of KV pool: 0. SGLang keeps the Gated
+  # DeltaNet state in its own Mamba slots (--max-mamba-cache-size, allocated outside the KV
+  # pool that max_total_num_tokens counts); the 5,000 was vLLM's, whose pool holds that state.
+  state_reserve_tokens: 0
+  # Tool replies a tool-arm stream may add to its context: P5.3's reply budget
+  # (tool_config's reply_tokens, 16,384).
+  tool_reply_reserve_tokens: 16384
+  # Seconds before the generation stop at which thinking turns still running are cut and
+  # forced: 6,144 tokens at 30 tokens per second is about 205 s, plus the prefill of the cut tail.
+  force_reserve_s: 360
+  # Socket timeout of a request: a queued request waits for KV without a byte.
+  request_timeout_s: 3600
+  # Competition only: a task whose tool loop raised runs once more plain (the arm's own failure,
+  # not the engine's), so a sandbox fault costs time, not the task.
+  plain_after_tool_error: true
+
+# The budget planner (scripts/fn_probe.py, plan_budget): the most streams s (at least one per
+# arm) whose context c = min(86,016, floor(P / s) - state) keeps the plain arm's thinking budget,
+# c less the largest opening, the forcing reserve and the margin, at or above
+# min_thinking_tokens; below it even then, one stream per arm at the context the pool allows. The coverage that leaves is reported, not targeted. In both
+# modes the window and the openings are the scored rerun's (development: the visible test file),
+# so the development pairs run at the rerun's budget.
+planner:
+  # The floor of the thinking budget (revision 15: 29,000, was 42,000). The human (30 Oct, 23:35):
+  # "try to do it in less that 86k and let's see because we might be able to do in less"; the
+  # note docs/research/fn_tonight_settings.md on task/ideas (d92431a, "Config changes for
+  # revision 15") sets the floor so that 4 x L4's small pools still run several streams, since
+  # the expected solves N(c) S(b(c)) gain more from the streams than from thinking past about
+  # 30k there (budget_vs_solves.md on task/ideas: S(b) 3.0% at 24k and 32k, 5.2% at 40k). A
+  # stream needs c - o_max - F - m >= 29,000, so c >= 42,168 with the largest opening 6,896,
+  # F 6,144, m 128: 2 streams from P >= 84,336, 3 from P >= 126,504 (at most 3, the server's
+  # limit). With the measured openings and no state reserve: 1 stream at 70,000 for a 70k pool
+  # (2 at 35k would think 21.8k, under the floor), 2 at 44,928 for the BF16 fallback's 89,856,
+  # 3 at 56,576 (thinking 43,408) for the estimated FP8 pool of 169,728 (fn_l4_memory.md).
+  min_thinking_tokens: 29000
+  # Decode tokens per second per stream for the reported coverage, before any is measured: the
+  # low end of the research note's 29 to 41 at 3 to 4 streams (flash_next_shot.md, section 3).
+  rate_tokens_per_s: 30
+  # The coverage is re-reported once, from the median decode rate of the first requests of at
+  # least replan_min_tokens (thinking and tool turns).
+  replan_after_requests: 4
+  replan_min_tokens: 2000
+
+# The tool arm (task P5.3).
+tool:
+  # The loop's module; its interface is docs/tasks/P5.3.md on task/P5.3.
+  module: arc26.agent.toolshot
+  # A folder put first on sys.path, relative to this script (the tests' stand-in only).
+  extra_path: null
+  # One arc26.agent.verify.PoolVerifier for every tool stream, a worker each (P5.3's advice for
+  # several streams), passed as solve_with_tools' verifier.
+  shared_verifier: true
+  # arc26.agent.toolshot.tool_config's mapping (it refuses unknown keys); a missing key keeps
+  # P5.3's default (40 calls, 10 s per call, 2,000-character replies, effort xhigh). Set per task
+  # from the plan (scripts/fn_probe.py, tool_budget): cap and context as the plain arm's rule,
+  # reply_tokens at most the context / 5 (and at most solve.tool_reply_reserve_tokens),
+  # forcing_tokens and thinking_end_note the plain arm's.
+  # Revision 17: replies up to 4,000 characters (head and tail kept, feedback.clip; P5.3's
+  # default 2,000): version 14 clipped 11 of its 93 tool replies at 2,000
+  # (docs/experiments/P5.2-01-r16.md on task/P5.2, 2073d8c). 4,000 characters are about 1,300
+  # tokens, far inside reply_tokens (the context / 5, about 13,000 at 65k).
+  loop: {reply_chars: 4000}
+
+# The run's own stops (Kaggle cannot cancel a running kernel; docs/prerun/TEMPLATE.md, section
+# 7). The boot timeout and the first generation (template_check) stop it before the solve.
+kill:
+  # Development only: there a stop saves quota; in a scored rerun the unanswered keep [[0]]
+  # anyway, so every task is still tried.
+  modes: [development]
+  # The rules apply once this many attempts have finished: one bad task is a task, two are the
+  # stack (P6.3-02's rule at a smaller scale).
+  min_attempts: 2
+  # More than this share of failed attempts (HTTP or connection errors) stops new starts.
+  error_share: 0.5
+  # More than this share of degenerate attempts stops new starts.
+  degenerate_share: 0.5
+  # A run of this many identical consecutive tokens marks an attempt degenerate (P6.9-01's
+  # degenerate.max_run).
+  max_run: 64
+  # Token ids at or above this are special (generation_config.json, the 27B's tokenizer, which
+  # P5.2-00 checks is this model's): never counted in a run.
+  special_min_id: 248044
+
+# For scripts/fn_report.py (local, after the pull): the comparison rows of the brief.
+report:
+  # The same 15 tasks on the 27B (docs/experiments/P6.9-01.md: 6.0 of 15; full solves 1818057f,
+  # 6e453dd6, a395ee82, b0039139, e8686506; halves 247ef758, 7ed72f31), at its 94,208 cap.
+  reference_run: P6.9-01
+  reference_cap: 94208
+  reference_scores: {97d7923e: 0.0, 247ef758: 0.5, 7b3084d4: 0.0, 898e7135: 0.0, 142ca369: 0.0,
+                     88e364bc: 0.0, a25697e4: 0.0, a395ee82: 1.0, b5ca7ac4: 0.0, b0039139: 1.0,
+                     e8686506: 1.0, 7ed72f31: 0.5, 6e453dd6: 1.0, 1818057f: 1.0, 7c66cb00: 0.0}
+  # The 27B's aggregate decode rate the task brief compares against (about 285 tokens per
+  # second in version 9's shot; P6.9-01: 325.1 at 15 running, 214.5 over the shot).
+  reference_aggregate_tok_s: 285
+  # The harness note's pre-registered rule (docs/research/flash_next_harness.md, "The DEV
+  # measurement"): B if S_B >= S_A, B's median wall at most 1.3 x A's, and continuations at
+  # least 90% cached; A if S_A - S_B >= 2 or B's median wall above 1.5 x A's; else the human.
+  rule:
+    b_wall_ratio: 1.3
+    a_wall_ratio: 1.5
+    cached_share: 0.9
+    margin_tasks: 2
+
+# The CPU smoke (scripts/fn_probe.py --smoke --root <dir>): the fake server
+# (scripts/fn_fake_sglang.py), the fake tokenizer, six tiny tasks, development mode (both arms),
+# no install, about a minute; the tool arm is the real arc26.agent.toolshot (task P5.3).
+smoke:
+  run_id: P5.2-01-smoke
+  mode: development
+  time_plan:
+    competition: {generation_stop_s: 60, end_s: 80, min_start_s: 1}
+    development: {generation_stop_s: 60, end_s: 80, min_start_s: 1}
+  health: {interval_s: 0.5, failures: 2, max_restarts: 1, min_left_s: 5, max_requeue: 1,
+           probe_timeout_s: 2, kill_probes: 3}
+  # The stress check's short replies on the fake.
+  stress: {enabled: true, modes: [development, competition], max_new: 32, timeout_s: 60,
+           filler: "0 1\n", fallback_flags: {--chunked-prefill-size: 1024,
+                                              --prefill-max-requests: 4}}
+  tokenizer: fake
+  python: {want: auto}
+  patches: {items: []}
+  kill: {special_min_id: 256}
+  install: {enabled: false}
+  precache: {enabled: false}
+  # The copy of the smoke's fake wheelhouse (build_smoke_tree): 1 MiB pieces, so its 3 MiB wheel
+  # is copied in 4 pieces by 2 readers.
+  local_inputs: {enabled: true, inputs: [wheelhouse, env_output], workers: 2, piece_mib: 1,
+                 max_s: 30, stall_s: 10, reserve_gb: 0}
+  tool: {module: arc26.agent.toolshot, extra_path: null, shared_verifier: true, loop: {}}
+  # A floor for the fake's byte-level prompts (about 1,066 tokens): 4 streams of the 20,000 pool
+  # give a context of 5,000 and every task the smoke's C_max, 1,000.
+  planner: {min_thinking_tokens: 1500, rate_tokens_per_s: 50, replan_after_requests: 4,
+            replan_min_tokens: 50}
+  paths:
+    input_root: /kaggle/input
+    out: /kaggle/working/run_logs/fn
+    engine_log: /kaggle/working/fn_engine_full.log
+    scratch: /tmp/fn
+    submission: /kaggle/working/submission.json
+  inputs:
+    wheelhouse: {path: /kaggle/input/datasets/fake/pennyroyal, marker: requirements.lock, required: false}
+    env_output: {path: /kaggle/input/none, marker: fn_env_output.json, required: false}
+    fa2_output: {path: /kaggle/input/none, marker: fn_env_output.json, required: false}
+    code: {path: /kaggle/input/none, marker: fn_code.json, required: false}
+    model: {path: /kaggle/input/models/fake/1, marker: config.json, required: true}
+    drafter: {path: /kaggle/input/none, marker: config.json, required: false}
+    competition: {path: /kaggle/input/competitions/fake, marker: arc-agi_test_challenges.json, required: true}
+  engine:
+    module: null
+    script: fn_fake_sglang.py
+    port: 30917
+    boot_timeout_s: 30
+    poll_s: 0.2
+    boot_retry_flags: {}
+    # No boot ladder in the smoke (revision 17's ladder is tested on its own).
+    boot_ladder: null
+    flags:
+      --port: "{port}"
+      --model-path: "{model}"
+      --max-running-requests: 8
+      --think-tokens: 80
+      --fake-pool: 20000
+      --tensor-parallel-size: 4
+      --incremental-streaming-output: true
+      --stream-interval: 16
+      --tool-calls: 1
+  monitor: {interval_s: 0.5}
+  # The fake server's stand-in for the fork's ServerArgs, which refuses --language-model-only as
+  # the fork does; it accepts every other flag.
+  arg_check: {enabled: true, module: fn_fake_sglang, timeout_s: 60, drop_flags: []}
+  # The smoke imports the fake server's module (the code folder is on the child's sys.path); a
+  # test sets a module that is missing to drive the KV4 fallback.
+  import_check: {enabled: true, timeout_s: 60, modules: [fn_fake_sglang], kv4_modules: []}
+  solve:
+    # Both arms in the smoke, whatever the development run's dev_arms (revision 13: plain).
+    dev_arms: [plain, tool]
+    task_ids: [s0000001, s0000002, s0000003, s0000004, s0000005, s0000006]
+    # Thinking stops at 700; the fake's long tasks (800 bytes) are cut and forced, the short
+    # ones (80) end by themselves.
+    cap: 1000
+    forcing_tokens: 300
+    max_streams: 4
+    state_reserve_tokens: 0
+    tool_reply_reserve_tokens: 1000
+    force_reserve_s: 5
+    request_timeout_s: 30

@@ -1,0 +1,267 @@
+# GPU spike of the agent solver, run P6.3-01 (task P6.3, ADR-020; BRIEF A8, A9). Read by
+# scripts/agent_spike.py with yaml.safe_load: every key below is required and no other key is
+# accepted. Pre-run brief: docs/prerun/P6.3-01.md. Runbook: docs/runbooks/agent_spike.md. On
+# Kaggle the script notebook configs/P6.3-01-script.yaml runs it with the outputs of the two
+# download notebooks (configs/P6.3-download.yaml) attached. Sources cited as "models note" are
+# docs/research/qwen38_and_small_models.md; "design note" is agent_library_design.md.
+
+# Run id of the pre-run brief this config serves; run.json and summary.md carry it.
+run_id: P6.3-01
+
+# The project's one fixed seed (CLAUDE.md): the synthetic prompts, the probe's task sample, and
+# every request's sampling seed derive from it.
+seed: 0
+
+# The script's own wall-time budget in seconds from its start. The session's Timeout is 7200 s
+# (the brief's 2 h hard stop) and the notebook kills the script 6900 s after the notebook's start;
+# the script started 188.9 s in (attempt 2: environment check 139.6 s, wheel install 49.2 s;
+# attempt 1's check took 218.3 s), so stopping itself at 6300 s leaves about 380 to 410 s to stop
+# the server (at most 60 + 30 s) and write the logs before that kill.
+max_wall_s: 6300
+
+# Phases in run order once the engine is up. The 8k cells first: the cheapest, and the
+# throughput gate's first number. Then the solve probe, the run's solve signal. The 32k cells
+# last: the costliest (prefill of up to 64 prompts of 32k tokens), so a short budget cuts them and
+# never the probe.
+phases: [throughput-8k, probe, throughput-32k]
+
+# Root under which Kaggle mounts the inputs; the challenges are found by search under it (mounts
+# moved within 2026, docs/research/kaggle_first_runs.md, open risk 6).
+input_root: /kaggle/input
+
+# Outputs (BRIEF A8): what scripts/kaggle_ops.py pull brings back. The notebook writes its own
+# files here too (env.json, pip_freeze.txt, stages.json, candidates.json); the script avoids
+# those names.
+out_dir: /kaggle/working/run_logs
+
+# Scratch for the venv, the engine's caches, and the full server log: never saved, and /tmp had
+# about 1.1 TB free in every probe (K0, P0.5d-cpu).
+scratch_dir: /tmp/agent-spike
+
+# The weights: the model notebook's output (configs/P6.3-download.yaml, model).
+model:
+  # The folder of that output holding the 12 files; vLLM loads it read-only from the mount.
+  folder: qwen38-27b-int4
+  # The revision the download notebook verified: its MANIFEST.json must name it, with ok true.
+  revision: 91bd022d5b49442a868bc35008f6c21e1860edfa
+  # Re-hash the 19.47 GB here: no. The download notebook checked every file's sha256 against the
+  # Hub's (its MANIFEST.json); here each file's size is checked against that manifest, which
+  # catches a truncated mount, and a full hash would cost 1 to 2 minutes of 4xL4 time
+  # (estimate: 200 to 300 MB/s read).
+  verify_hashes: false
+
+# The engine: the wheels notebook's output (configs/P6.3-download.yaml, wheels).
+wheels:
+  # The folder of that output holding the wheels, requirement files, and the installer.
+  folder: wheelhouse
+  # The engine version its MANIFEST.json must list (ADR-020; models note, section 4.1).
+  vllm: 0.31.0
+  # The interpreter that creates the venv: the image's Python 3.11.13 at /usr/bin/python3.11, the
+  # kernel interpreter of every session log (P3.5-02, MT-01) and the one the wheels notebook's
+  # install check used; the script falls back to its own interpreter if this path is missing.
+  base_python: /usr/bin/python3.11
+  # The venv, under scratch: about 10 GB installed (estimate), never saved.
+  venv: /tmp/agent-spike/venv
+  # Seconds allowed for the offline install, pip unzipping about 4 GB of wheels without
+  # byte-compiling; the wheels notebook's install_check.json measures it on 4 CPUs first, and
+  # this host has 48 (MT-01's run record).
+  timeout_s: 1500
+  # Modules the engine's workers import, imported once with the venv's python and the engine's
+  # environment after the install and before the boot (prepare_engine), in the workers' order:
+  # the worker; the device communicators vLLM's CudaCommunicator imports unconditionally (attempt
+  # 2 died in each worker in flashinfer_all_reduce, on `import flashinfer.comm`); the model runner;
+  # the model (Qwen3_5ForConditionalGeneration), its Gated DeltaNet layer, the Triton and GDN
+  # attention backends, the W4A16 compressed-tensors scheme, the sampler, the kernel warmup. All
+  # exist in vLLM v0.31.0 (its source tree, checked 10 Oct).
+  engine_imports:
+    - vllm.v1.worker.gpu_worker
+    - vllm.distributed.device_communicators.cuda_communicator
+    - vllm.distributed.device_communicators.custom_all_reduce
+    - vllm.distributed.device_communicators.flashinfer_all_reduce
+    - vllm.distributed.device_communicators.flashinfer_pcie_ipc_all_reduce
+    - vllm.distributed.device_communicators.pynccl
+    - vllm.distributed.device_communicators.quick_all_reduce
+    - vllm.distributed.device_communicators.symm_mem
+    - vllm.v1.worker.gpu_model_runner
+    - vllm.model_executor.models.qwen3_5
+    - vllm.model_executor.layers.mamba.gdn.qwen_gdn_linear_attn
+    - vllm.v1.attention.backends.triton_attn
+    - vllm.v1.attention.backends.gdn_attn
+    - vllm.model_executor.layers.quantization.compressed_tensors.compressed_tensors
+    - vllm.v1.sample.sampler
+    - vllm.model_executor.warmup.kernel_warmup
+  # Seconds for that check: `import vllm` took 9.2 s in attempt 2's install probe, and these
+  # modules add torch's CUDA setup, Triton, and flashinfer.comm (estimate: under a minute).
+  engine_check_timeout_s: 600
+
+# vLLM's server: `vllm serve <model dir>` from the venv. The flags were checked against the
+# v0.31.0 sources (vllm/engine/arg_utils.py, vllm/entrypoints/launchers/cli_args.py) on 9 Oct.
+server:
+  # Local only: the client runs in the same session.
+  host: 127.0.0.1
+  # vLLM's default port.
+  port: 8000
+  # The name requests use; any string works.
+  served_model_name: qwen38-27b-int4
+  # All four L4s in one replica: the KV heads (4) allow 1, 2, or 4, the INT4 weights leave under
+  # 2 GB for KV on one L4, and one TP4 replica beats two TP2 replicas by not duplicating weights
+  # (models note, section 5.2).
+  tensor_parallel_size: 4
+  # FP8 KV cache with the checkpoint's static scales (its kv_cache_scheme): half the memory of
+  # BF16 KV, so about twice the sequences (models note, sections 1 and 5.2).
+  kv_cache_dtype: fp8
+  # Prefix caching on: the agent resends each conversation every turn (design note, 5.2); its hit
+  # rate is measured, and the NaN bug #55766 needs speculation, which is off.
+  enable_prefix_caching: true
+  # Context limit per request: the agent's long attempts reach 40k to 60k tokens (design note,
+  # 5.5); vLLM prints the maximum concurrency for this length at boot.
+  max_model_len: 65536
+  # Concurrent sequences: the largest concurrency measured (64). vLLM's default (1024) exceeded the
+  # state slots of hybrid models at CUDA-graph capture for one participant (models note, 4.3).
+  max_num_seqs: 64
+  # Prompt tokens per scheduler step (chunked prefill): 8192 keeps GEMMs large for the 32k prompts
+  # while bounding activation memory; vLLM's online default is smaller.
+  max_num_batched_tokens: 8192
+  # Share of each L4's 23,034 MiB vLLM may use: 0.90 leaves about 2.3 GB per GPU for the CUDA
+  # context, NCCL, and the sampler (vLLM's default is 0.92).
+  gpu_memory_utilization: 0.90
+  # Triton attention: it takes an FP8 KV cache on sm_89, where FlashAttention 2 does not, and
+  # needs no FlashInfer JIT, which would need a CUDA 13 nvcc the image lacks (models note, 4.1
+  # and 4.2).
+  attention_backend: TRITON_ATTN
+  # Text only: the vision tower (about 0.9 GB BF16) is never loaded (models note, 7.1).
+  language_model_only: true
+  # Splits the thinking from the answer (reasoning in the delta's `reasoning` field, vLLM 0.31);
+  # the model card's own serving command uses it.
+  reasoning_parser: qwen3
+  # Default sampling from the checkpoint's generation_config.json: temperature 1.0, top_p 0.95,
+  # top_k 20, the model card's settings for thinking.
+  generation_config: auto
+  # No other flag: in particular no --speculative-config. MTP collapses the batch to about three
+  # sequences on 24 GB cards (#55533) and speculation with prefix caching gives NaN logits
+  # (#55766) (models note, 4.3).
+  extra_args: []
+  # Engine environment, added to the image's with PYTHONPATH and PIP_* removed (the image's
+  # PYTHONPATH carries torch 2.8 from the attached install notebook).
+  env:
+    # The PyTorch top-k and top-p sampler, no FlashInfer JIT (no CUDA 13 nvcc in the image).
+    VLLM_USE_FLASHINFER_SAMPLER: "0"
+    # Engine startup limit: loading 19.5 GB from a mount, torch.compile, and graph capture may pass
+    # vLLM's default 600 s on the first boot (estimate); the script's own boot limit is below.
+    VLLM_ENGINE_READY_TIMEOUT_S: "1800"
+    # Caches on scratch, never in the output.
+    VLLM_CACHE_ROOT: /tmp/agent-spike/vllm-cache
+    # Hugging Face caches on scratch.
+    HF_HOME: /tmp/agent-spike/hf-home
+    # The session has no internet: no Hub lookups.
+    HF_HUB_OFFLINE: "1"
+    # Same, for transformers.
+    TRANSFORMERS_OFFLINE: "1"
+    # No usage reporting attempts in an offline session.
+    VLLM_NO_USAGE_STATS: "1"
+    # Same, for the libraries that read it.
+    DO_NOT_TRACK: "1"
+    # NCCL prints at init whether the GPUs talk by P2P or shared memory (models note, 4.3: P2P on
+    # Kaggle's L4 VM is unknown); a few hundred lines in the server log.
+    NCCL_DEBUG: INFO
+    # Triton's compile cache on scratch.
+    TRITON_CACHE_DIR: /tmp/agent-spike/triton-cache
+    # Inductor's compile cache on scratch.
+    TORCHINDUCTOR_CACHE_DIR: /tmp/agent-spike/inductor-cache
+  # Variables removed from the engine's environment: a TRITON_PTXAS_PATH pointing at the image's
+  # CUDA 12 ptxas (NVARC's launch line sets one) would compile Triton 3.7's newer PTX with an
+  # older assembler; Triton uses its bundled tools without them.
+  unset_env: [TRITON_PTXAS_PATH, TRITON_CUOBJDUMP_PATH, TRITON_NVDISASM_PATH]
+  # Seconds until /health answers: the first boot loads and compiles everything (estimate 5 to 15
+  # minutes); past this the run stops as an Error.
+  boot_timeout_s: 1800
+  # Seconds between SIGTERM and SIGKILL of the server's process group at the end.
+  stop_timeout_s: 60
+  # Seconds between samples of nvidia-smi and the server's /metrics.
+  sample_interval_s: 5
+
+# One request after boot that must come back sane before any measurement.
+sanity:
+  # Generated-token cap: a short thinking answer fits well under it.
+  max_tokens: 2048
+  # Low effort: brief thinking (the chat template's own instruction), to keep it short.
+  reasoning_effort: low
+
+# Throughput cells (design note, 6.2; models note, 7.2): each sends `concurrency` streaming
+# requests at once and waits for all of them.
+throughput:
+  # Generated tokens per request, with ignore_eos so every request generates exactly this many;
+  # 2048 decode steps make a steady window of a minute or more at every concurrency.
+  output_tokens: 2048
+  # The brief's concurrencies: 1 (single stream), 8, 16, 32 (the design's band), and 64 (the top
+  # of max_num_seqs; at 32k the KV pool may hold fewer, which the run measures).
+  concurrency: [1, 8, 16, 32, 64]
+  # Thinking on at the template's default effort (xhigh): the agent's long attempts; the effort
+  # changes what is written, not the cost of a decode step.
+  reasoning_effort: null
+  # Mean contexts: each prompt has about prompt_tokens tokens of ARC-like grids, and with 2048
+  # generated tokens the mean context over the decode is prompt_tokens + 1024: 8,192 and 32,768.
+  # cell_timeout_s caps one cell; budget_s caps the phase, null meaning until the run's deadline.
+  # Estimates for 64 requests: 8k needs about 450k prompt tokens and 131k generated tokens (about
+  # 5 minutes); 32k about 2.0M prompt tokens (10 to 15 minutes at 2.5k to 3.5k prefill tokens per
+  # second, an estimate) plus the decode.
+  contexts:
+    # Mean context 8,192: the 25-minute phase budget protects the probe that follows.
+    8k: {prompt_tokens: 7168, cell_timeout_s: 900, budget_s: 1500}
+    # Mean context 32,768: runs until the deadline, as the last phase.
+    32k: {prompt_tokens: 31744, cell_timeout_s: 1500, budget_s: null}
+  # A cell starts only if this many seconds of the phase's budget remain.
+  min_cell_s: 120
+  # Tokens of one unmeasured warmup request at each context's prompt length before its cells:
+  # Triton tunes some kernels per shape on first use, which would otherwise fall into the first
+  # cell; the sanity request's prompt is far shorter. Its cold time to first token is recorded.
+  warmup_tokens: 32
+
+# The solve probe: ARC-AGI-2 training tasks, one program request and one feedback round each.
+probe:
+  # Competition data folder name: the challenges and solutions are the files under it.
+  competition: arc-prize-2026-arc-agi-2
+  # Training tasks only: never evaluation data in a probe (BRIEF A0); 1000 tasks (K0 listing).
+  challenges: arc-agi_training_challenges.json
+  # Their solutions score the test outputs; they are training data, allowed in any mode.
+  solutions: arc-agi_training_solutions.json
+  # Tasks probed: the brief's 10, all at once (the engine's batching makes 10 cost about one).
+  n_tasks: 10
+  # Eligible tasks: one test input (one comparison per task) and a rendered prompt of at most
+  # this many characters, about 5k tokens of digit rows, so 10 short prompts at low effort finish
+  # inside the phase budget. The sample is seeded (seed above) and recorded.
+  max_task_chars: 6000
+  # Rounds per task: the first request plus one feedback round with the checker's report.
+  rounds: 2
+  # Generated tokens per round, thinking included: low effort keeps most answers far below; a
+  # stop at this cap is counted (finish_reason length), not hidden.
+  max_tokens: 16384
+  # Thinking on, low effort (the brief): 22.8% on the ARC-AGI-2 semi-private set at low effort
+  # with direct answers (arcprize; models note, 2.1).
+  reasoning_effort: low
+  # Phase limit in seconds: two rounds of up to 16k tokens at about 30 tokens per second per
+  # stream take at most about 18 minutes (estimate); 25 minutes, then open requests are dropped.
+  budget_s: 1500
+  # Seconds per program check (all inputs of a task): generous for numpy on 30x30 grids.
+  checker_timeout_s: 20
+  # Address-space limit of the checker in MiB: stops a runaway allocation, as P6.1's sandbox will.
+  checker_memory_mb: 2048
+
+# Degenerate outputs: the symptom of NaN logits or a broken kernel.
+degenerate:
+  # A run of this many identical consecutive tokens marks an output degenerate.
+  max_run: 64
+  # Token ids at or above this are special (generation_config.json: <|endoftext|> 248044,
+  # <|im_end|> 248046): runs of them after ignore_eos are not counted.
+  special_min_id: 248044
+  # End-of-sequence ids (generation_config.json: <|im_end|> 248046, <|endoftext|> 248044): runs
+  # are counted only before the first, since with ignore_eos a finished model keeps generating.
+  eos_ids: [248046, 248044]
+
+# Kill criteria, applied by the script itself (docs/prerun/P6.3-01.md, section 7).
+kill:
+  # More than this share of degenerate outputs in one cell or in the probe stops the run.
+  degenerate_share: 0.5
+  # More than this share of failed requests (HTTP or connection errors) in one cell or in the
+  # probe stops the run.
+  error_share: 0.5

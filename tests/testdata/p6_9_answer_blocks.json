@@ -1,0 +1,223 @@
+{
+ "source": "the shot transcripts pulled from Kaggle (runs/, gitignored): P6.3-05 ~/wt-P6.3c/runs/P6.3-05/run_logs/direct_transcripts.jsonl; P6.3-06 ~/wt-P6.3d/runs/P6.3-06/run_logs/direct_transcripts.jsonl; P6.5-02 ~/wt-P6.5b/runs/P6.5-02/run_logs/agent/shot_transcripts.jsonl; P6.5-03 ~/wt-P6.5b/runs/P6.5-03/run_logs/agent/shot_transcripts.jsonl",
+ "runs": {
+  "P6.3-05": {
+   "valid_blocks": 24,
+   "invalid_blocks": [
+    {
+     "attempt_id": "e3721c99/p0/0",
+     "sha256": "c2ede08c65e8456fb76dd0a8cecfaab6fb896c96a9c489da5e63d27b0409e42f",
+     "strict": "invalid grid: ragged: row 17 has 31 cells, row 0 has 30",
+     "lenient": null
+    },
+    {
+     "attempt_id": "195c6913/p0/0",
+     "sha256": "c8647e1fc462d0d6ddae03cf0c7b133c365b771803c95394fc201ef039a92a34",
+     "strict": "invalid grid: 31 rows, expected 1 to 30",
+     "lenient": null
+    }
+   ]
+  },
+  "P6.3-06": {
+   "valid_blocks": 24,
+   "invalid_blocks": [
+    {
+     "attempt_id": "62593bfd/p0/0",
+     "sha256": "9f0490280bbcecf9d03c2cf672668b83fb6ad51da69ed4e641b7010192f07fee",
+     "strict": "invalid grid: row 0 is not a list (str)",
+     "lenient": {
+      "test_index": 0,
+      "shape": [
+       25,
+       25
+      ]
+     }
+    },
+    {
+     "attempt_id": "62593bfd/p0/0",
+     "sha256": "ad93c9425d8d3057b5da2df7c21efe07197cb75da95bed9afd283a7f3235090d",
+     "strict": "invalid grid: row 0 is not a list (str)",
+     "lenient": {
+      "test_index": 0,
+      "shape": [
+       24,
+       25
+      ]
+     }
+    },
+    {
+     "attempt_id": "62593bfd/p0/0",
+     "sha256": "ad93c9425d8d3057b5da2df7c21efe07197cb75da95bed9afd283a7f3235090d",
+     "strict": "invalid grid: row 0 is not a list (str)",
+     "lenient": {
+      "test_index": 0,
+      "shape": [
+       24,
+       25
+      ]
+     }
+    },
+    {
+     "attempt_id": "62593bfd/p0/0",
+     "sha256": "90b09c611a870d41c3ed34daca2216fcf4d77d2072b8e1df5dcba8ac45967ceb",
+     "strict": "invalid grid: row 0 is not a list (str)",
+     "lenient": {
+      "test_index": 1,
+      "shape": [
+       19,
+       28
+      ]
+     }
+    },
+    {
+     "attempt_id": "62593bfd/p0/0",
+     "sha256": "ad93c9425d8d3057b5da2df7c21efe07197cb75da95bed9afd283a7f3235090d",
+     "strict": "invalid grid: row 0 is not a list (str)",
+     "lenient": {
+      "test_index": 0,
+      "shape": [
+       24,
+       25
+      ]
+     }
+    },
+    {
+     "attempt_id": "62593bfd/p0/0",
+     "sha256": "90b09c611a870d41c3ed34daca2216fcf4d77d2072b8e1df5dcba8ac45967ceb",
+     "strict": "invalid grid: row 0 is not a list (str)",
+     "lenient": {
+      "test_index": 1,
+      "shape": [
+       19,
+       28
+      ]
+     }
+    },
+    {
+     "attempt_id": "271d71e2/p0/0",
+     "sha256": "a17c11428aa6939255b374dde530873e78177701963d17f66e2edbba49029b21",
+     "strict": "invalid grid: ragged: row 12 has 25 cells, row 0 has 26",
+     "lenient": null
+    },
+    {
+     "attempt_id": "13e47133/p0/0",
+     "sha256": "7f46114e4b873c4021da209ad3c0a2e0b03c385e30cea99eea19dbfebc24a6fe",
+     "strict": "invalid grid: ragged: row 3 has 31 cells, row 0 has 30",
+     "lenient": null
+    },
+    {
+     "attempt_id": "13e47133/p0/0",
+     "sha256": "220832fff43a70a24916d4392e70d8e46b624d0baf61e774c04de14f7d4665b3",
+     "strict": "invalid grid: ragged: row 2 has 31 cells, row 0 has 30",
+     "lenient": null
+    }
+   ]
+  },
+  "P6.5-02": {
+   "valid_blocks": 2,
+   "invalid_blocks": [
+    {
+     "attempt_id": "36a08778/p0/0",
+     "sha256": "3609ec23f4fa054ad78e71ed452fd4a96e216374e31468f31fe7cea45e240c99",
+     "strict": "not JSON (Expecting ',' delimiter: line 17 column 21 (char 363))",
+     "lenient": {
+      "test_index": 0,
+      "shape": [
+       16,
+       16
+      ]
+     }
+    },
+    {
+     "attempt_id": "36a08778/p0/0",
+     "sha256": "e0d7e64405e49014720b9ffba9c7882877cd9e506c1516e01dc928541c09e027",
+     "strict": "not JSON (Expecting ',' delimiter: line 30 column 35 (char 1042))",
+     "lenient": {
+      "test_index": 1,
+      "shape": [
+       29,
+       30
+      ]
+     }
+    }
+   ]
+  },
+  "P6.5-03": {
+   "valid_blocks": 41,
+   "invalid_blocks": [
+    {
+     "attempt_id": "511cb051/p0/0",
+     "sha256": "58f8ece37c908c1d6a413e7925c0e63c537a4699916fdd92136b957f4ef749ad",
+     "strict": "invalid grid: 38 columns, expected 1 to 30",
+     "lenient": null
+    },
+    {
+     "attempt_id": "511cb051/p0/0",
+     "sha256": "8b5803618dad66a77ee56d84c40f5ad33d4c23d4d4f54c4f6d405a836f20d98e",
+     "strict": "invalid grid: 36 columns, expected 1 to 30",
+     "lenient": null
+    },
+    {
+     "attempt_id": "271d71e2/p0/0",
+     "sha256": "1380e029e86321be7a6f751590bc0cbdd97f677a9edc9b083034e04cce4391ef",
+     "strict": "invalid grid: ragged: row 24 has 28 cells, row 0 has 26",
+     "lenient": null
+    },
+    {
+     "attempt_id": "136b0064/p0/0",
+     "sha256": "0935bcda4fb5b2a3ea9d16c011814bc06d0cb5f481e4999ff7a7aedec26c79f0",
+     "strict": "not JSON (Expecting ',' delimiter: line 1 column 144 (char 143))",
+     "lenient": null
+    },
+    {
+     "attempt_id": "136b0064/p0/0",
+     "sha256": "43bb22983ae64d1833eded37365d6d0aa749cbed6e5ce8a8c9e9942916f4a0d0",
+     "strict": "not JSON (Expecting ',' delimiter: line 1 column 259 (char 258))",
+     "lenient": null
+    },
+    {
+     "attempt_id": "a333fcf9/p0/0",
+     "sha256": "29e2a7f6d4b5af62fc3d70fc7b4544a18c4f92d32ce2499668a06454e9b4e52d",
+     "strict": "invalid grid: value '8' at row 0, column 0 is not an integer",
+     "lenient": {
+      "test_index": 0,
+      "shape": [
+       14,
+       20
+      ]
+     }
+    },
+    {
+     "attempt_id": "80a900e0/p0/0",
+     "sha256": "0a5c7a1e58d4a71d3503c5f8c85a0e5134c49779a099c6e04e0e4fe28d957c5a",
+     "strict": "invalid grid: ragged: row 14 has 23 cells, row 0 has 21",
+     "lenient": null
+    },
+    {
+     "attempt_id": "6e4f6532/p0/0",
+     "sha256": "97d4f6a7779365a1151e99330f551eeef2f4d835d1bcd89d63a9a84f2a2bdbdf",
+     "strict": "invalid grid: ragged: row 7 has 29 cells, row 0 has 28",
+     "lenient": null
+    },
+    {
+     "attempt_id": "9012f7e7/p0/0",
+     "sha256": "0f901ca3237ba577079b2633a79b1a2b7b36748c5d83d7a6a1a4a383d65bfc1e",
+     "strict": "invalid grid: 31 rows, expected 1 to 30",
+     "lenient": null
+    },
+    {
+     "attempt_id": "a32d8b75/p0/0",
+     "sha256": "c771152f034363d296a16398bf73855601a0deee20cf87b71f0064a21e6f59a8",
+     "strict": "invalid grid: 31 rows, expected 1 to 30",
+     "lenient": null
+    },
+    {
+     "attempt_id": "a32d8b75/p0/0",
+     "sha256": "39770e2cb7f8c3cac8f8739865689ad115e41d44ef9891ec8aaa65f7b1517b81",
+     "strict": "invalid grid: 31 rows, expected 1 to 30",
+     "lenient": null
+    }
+   ]
+  }
+ }
+}

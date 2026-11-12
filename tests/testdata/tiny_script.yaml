@@ -1,0 +1,6 @@
+# Config of tests/testdata/tiny_script.py, the stand-in script of the simulated script notebook
+# (tests/test_notebook_local.py, task P0.5d). Read with yaml.safe_load.
+
+# The script's run-log folder, relative to its working directory (/kaggle/working on Kaggle), as
+# a BRIEF A8 script's out_dir.
+out_dir: run_logs

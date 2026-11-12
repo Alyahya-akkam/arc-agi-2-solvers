@@ -1,0 +1,198 @@
+{
+ "tables": [
+  {
+   "label": "DEV40",
+   "puzzles": 40,
+   "arms": {
+    "base": {
+     "role": "a",
+     "source": "base",
+     "metrics": {
+      "accuracy": 4.0,
+      "attempt_1": 0.05454545454545454,
+      "ce": 0.06007282354715845
+     },
+     "seconds": {
+      "span": 178.068887175,
+      "train": 0.0,
+      "encode": 0.0,
+      "h_forward": 0.0,
+      "decode": 170.87100304999996,
+      "rescoring": 6.02375385,
+      "ce": 0.73225135
+     }
+    },
+    "h": {
+     "role": "b",
+     "source": "hyper",
+     "metrics": {
+      "accuracy": 5.0,
+      "attempt_1": 0.05454545454545454,
+      "ce": 0.06027300863048287
+     },
+     "seconds": {
+      "span": 175.55550987499998,
+      "train": 0.0,
+      "encode": 1.8877692250000002,
+      "h_forward": 0.015260925000000005,
+      "decode": 165.744671575,
+      "rescoring": 6.682015100000001,
+      "ce": 0.7327045499999999
+     }
+    },
+    "sgd": {
+     "role": "c",
+     "source": "sgd",
+     "metrics": {
+      "accuracy": 10.5,
+      "attempt_1": 0.12727272727272726,
+      "ce": 0.07444906604383394
+     },
+     "seconds": {
+      "span": 479.827922225,
+      "train": 151.04192739999996,
+      "encode": 0.0,
+      "h_forward": 0.0,
+      "decode": 293.91904377500003,
+      "rescoring": 29.4249261,
+      "ce": 0.7347277750000001
+     }
+    },
+    "h-fit": {
+     "role": "f",
+     "source": "hyper_fit",
+     "metrics": {
+      "accuracy": 10.5,
+      "attempt_1": 0.14545454545454545,
+      "ce": 0.07037798739972662
+     },
+     "seconds": {
+      "span": 462.30702329999986,
+      "train": 150.74343879999998,
+      "encode": 0.0,
+      "h_forward": 0.01617005,
+      "decode": 281.622108375,
+      "rescoring": 24.608763924999998,
+      "ce": 0.735190375
+     }
+    }
+   },
+   "fractions": {
+    "b": {
+     "accuracy": {
+      "f": 0.15384615384615385,
+      "raw": 0.15384615384615385,
+      "floor": false,
+      "low": 0.0,
+      "high": 0.6,
+      "undefined": 3
+     },
+     "attempt_1": {
+      "f": 0.0,
+      "raw": 0.0,
+      "floor": false,
+      "low": -1.0,
+      "high": 0.5,
+      "undefined": 154
+     },
+     "ce": {
+      "f": 0.013924715263443495,
+      "raw": 0.013924715263443495,
+      "floor": false,
+      "low": -0.6053589235993638,
+      "high": 0.1181805571262392,
+      "undefined": 0
+     }
+    }
+   },
+   "start": {
+    "delta": 0.0,
+    "low": -2.5,
+    "high": 2.5,
+    "row": "Same score",
+    "straddles": true,
+    "loss": {
+     "c": {
+      "1": 0.0945575,
+      "8": 0.09647750000000002,
+      "16": 0.08265625,
+      "32": 0.0456478125,
+      "64": 0.0187853125,
+      "96": 0.0100525,
+      "128": 0.009564374999999998
+     },
+     "f": {
+      "1": 0.09368999999999998,
+      "8": 0.09551093749999999,
+      "16": 0.08060093750000001,
+      "32": 0.04882968750000001,
+      "64": 0.025295312499999993,
+      "96": 0.0184115625,
+      "128": 0.018166874999999996
+     }
+    },
+    "reach": {
+     "45a5af55": 94,
+     "cbebaa4b": null,
+     "195c6913": null,
+     "332f06d7": null,
+     "581f7754": null,
+     "31f7f899": 75,
+     "b5ca7ac4": null,
+     "f560132c": null,
+     "e376de54": null,
+     "db695cfb": null,
+     "9385bd28": null,
+     "dfadab01": null,
+     "dbff022c": null,
+     "de809cff": null,
+     "db0c5428": null,
+     "7b5033c1": 70,
+     "a25697e4": null,
+     "e3721c99": null,
+     "e12f9a14": null,
+     "dd6b8c4b": null,
+     "20a9e565": null,
+     "80a900e0": 63,
+     "2ba387bc": 117,
+     "4a21e3da": null,
+     "446ef5d2": null,
+     "8f3a5a89": null,
+     "28a6681f": null,
+     "7c66cb00": null,
+     "16de56c4": null,
+     "64efde09": null,
+     "136b0064": null,
+     "eee78d87": 124,
+     "7b0280bc": null,
+     "8698868d": 108,
+     "3e6067c3": 109,
+     "c7f57c3e": null,
+     "5961cc34": null,
+     "b0039139": 83,
+     "89565ca0": null,
+     "b10624e5": null
+    },
+    "reach_median": null,
+    "reached": 9,
+    "logged": 40,
+    "steps": 128,
+    "sooner": false
+   }
+  }
+ ],
+ "g4": {
+  "DEV40": {
+   "metric": "accuracy",
+   "f": 0.15384615384615385,
+   "low": 0.0,
+   "high": 0.6,
+   "row": "Bad",
+   "branch": "Bad: H's training continues and P3.7 repeats on the chain's final best point; Phase 4 does not stop",
+   "no_gap": false,
+   "straddles": true
+  }
+ },
+ "training_ended": false,
+ "decision": "The sets fall in different G4 branches or an interval crosses a boundary (DEV40: Bad): the human decides at G4."
+}

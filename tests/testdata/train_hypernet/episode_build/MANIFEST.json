@@ -1,0 +1,42 @@
+{
+ "augmentation": {
+  "id": "8 * j + 4 * t + k",
+  "ops": "transpose if t, then np.rot90 k times, then color c -> permutations[j][c]",
+  "permutations": [
+   "0123456789",
+   "7815342096",
+   "9486017235",
+   "7093256814"
+  ]
+ },
+ "code": {
+  "commit": "fixture",
+  "dirty": false
+ },
+ "counts": {
+  "toy": 12,
+  "train": 0,
+  "val": 6,
+  "val_puzzles": 3
+ },
+ "files": [
+  {
+   "bytes": 4978,
+   "path": "episodes/toy-00000-of-00001.jsonl",
+   "records": 12,
+   "sha256": "3a5cbb071b17dcf56f07c056f1b6c97ba51ec928a3b19b6f48a600cf66065e34",
+   "split": "toy"
+  },
+  {
+   "bytes": 2371,
+   "path": "episodes/val-00000-of-00001.jsonl",
+   "records": 6,
+   "sha256": "46f7fdead2594622b10fd1c08d9db28aa0d4a281603a0b1409bace7d37a515dd",
+   "split": "val"
+  }
+ ],
+ "max_tokens": 8192,
+ "note": "synthetic fixture of tests/test_train.py: small grids under simple rules",
+ "schema": 1,
+ "task": "P3.4"
+}

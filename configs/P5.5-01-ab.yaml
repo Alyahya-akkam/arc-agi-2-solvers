@@ -1,0 +1,376 @@
+# Run P5.5-01 (task P5.5, docs/tasks/P5.5.md; brief docs/prerun/P5.5-01.md): the 4-bit KV cache
+# of the QSA layers against FP8 on Modal's 2 x L40S (sm89, the L4's architecture). The notebook's
+# cell 2 runs scripts/fn_kvab.py (entry), which installs as fn_probe.py does (fn_probe.py's own
+# stages and the edits of patches.items, the KV4 ones inert while ARC26_KV4 is unset), checks the
+# kernels on one GPU (phase K), then boots A (FP8), B (4-bit K and V) and C (chosen by B's
+# reading) one after another (phase M). Runbook docs/runbooks/fn_kvab.md. The job's overrides
+# (TP 2, EP 2, the time plan, the tasks and their cap) are in configs/modal_P5.5-01.yaml.
+
+# Version 11 at P5.2-01 revision 16, then the kernel writer's fragment over it: patches.items
+# (revision 16's five edits and the hash-guarded KV4 ones, inert while ARC26_KV4 is unset) and
+# engine.env (the KV4 variables, which kvab.base_env removes from every boot so that A is FP8).
+# build_modal_job.resolve_extends merges them left to right, then this file.
+extends: [configs/P5.2-01.yaml, configs/P5.5-01.yaml]
+
+# The pre-run brief's Run-id (the job overrides it again, as every probe job does).
+run_id: P5.5-01
+
+# The notebook's cell 2 runs fn_kvab.py from the code dataset (build_modal_job.PROBE_ENTRIES adds
+# it, fn_bisect.py whose boot mechanics it imports, and the smoke's fn_fake_kvab.py).
+entry: fn_kvab.py
+
+# The kernel package and its tests, in one tar among the code files (their folders kept), so
+# phase K runs them as they run in the repository (build_modal_job.bundle_tar).
+bundle:
+  name: fn_kvq.tar
+  files: [scripts/fn_kvq/__init__.py, scripts/fn_kvq/bench.py, scripts/fn_kvq/layout.py,
+          scripts/fn_kvq/reference.py, scripts/fn_kvq/sglang_kv4.py,
+          scripts/fn_kvq/triton_kernels.py, tests/test_fn_kvq.py]
+
+# P5.2-07's boot settings (its engine_commands.jsonl: revision 10's values), where revision 16
+# tuned them for 4 x L4: the A boot is then P5.2-07's command line but for --random-seed, so its
+# pool and rates are comparable with P5.2-07's measured 448,192 tokens and about 61 tok/s.
+engine:
+  flags:
+    # Revision 16: 0.95 for the L4's 22.5 GiB; 0.92 is what P5.2-07 served with on 48 GB.
+    --mem-fraction-static: 0.92
+    # Revision 16: 3 (the planner's streams on L4); 8 here holds the 3 DEV streams and the
+    # decode runs with room, as P5.2-07.
+    --max-running-requests: 8
+    # Revision 16: 2,048 (the L4's activation margin); P5.2-07's 4,096.
+    --chunked-prefill-size: 4096
+    # Revision 16: 19 (= 5 x 3 + 4 on L4); P5.2-07's 44 at 8 running requests.
+    --max-mamba-cache-size: 44
+    # Revision 16: graphs at batch 1 to 3; P5.2-07's 1 to 8 (the decode runs use 1 to 3).
+    --cuda-graph-max-bs-decode: 8
+    --cuda-graph-bs-decode: [1, 2, 3, 4, 5, 6, 7, 8]
+
+# P6.9-01's notebook output (the job's input transcripts, mounted at Kaggle's path for a
+# notebook's output): the teacher-forced text's source. Required: without it no pass, no reading.
+inputs:
+  transcripts: {path: /kaggle/input/notebooks/alyahya737/arc26-p6-3-shot,
+                marker: run_logs/direct_transcripts.jsonl, required: true}
+
+# The solve settings the DEV tasks read (fn_probe.attempt_task, plain arm).
+solve:
+  # The first three of P6.9-01's 15 DEV120 tasks (revision 16's order; P5.2-07 ran the first
+  # two). 7c66cb00, the teacher-forced text's task, is not among them.
+  task_ids: [97d7923e, 247ef758, 7b3084d4]
+  # The thinking-length reading's cap (the methods note): the thinking turn gets
+  # 16,896 - 512 = 16,384 tokens, then the forcing turn writes the answers.
+  cap: 16896
+  # P5.2-07's 512, not revision 16's 6,144: a long forcing turn would cut the thinking at 10,752.
+  forcing_tokens: 512
+
+kvab:
+  # The stage runs only when on (fn_kvab.stage_ab).
+  enabled: true
+  # Revision 2: no boot at all when a KV4 edit a candidate needs did not apply at the install
+  # (fn_kvab.unapplied_edits): revision 1's configurator edits were anchored on the clone's file,
+  # not the wheel's, so its candidates would have booted FP8 against the FP8 baseline. The run
+  # then ends after phase K (about 0.20 USD) with kvab.json's "unapplied".
+  stop_if_unapplied: true
+  # Phase K: the kernel bundle's own checks on one GPU, before any boot; a failure ends the run.
+  kernel_check:
+    enabled: true
+    # The code file the builder packs from bundle.files.
+    bundle: fn_kvq.tar
+    # GPU 0 alone (CUDA_VISIBLE_DEVICES): the kernels are per-GPU; the other idles for under
+    # two minutes, cheaper than a separate one-GPU job's own start, fetch and install.
+    gpu: "0"
+    # The phase's wall budget: the brief's 0.2 USD at 0.00142812 USD/s is 140 s.
+    budget_s: 140
+    # The probe image's pytest (modal_job.PROBE_TEST_TARGET): the venv has none and the GPU
+    # stage has no network.
+    pytest_path: /opt/arc26-pytest
+    # Each command's output, head and tail, in kvq_<name>.log (pulled).
+    max_log_bytes: 2000000
+    commands:
+      # The kernel writer's benchmark at its real shapes: Triton against the reference, timings
+      # against the FP8 gather, the INT4 error; its JSON comes back as kvq_bench.json.
+      - name: bench
+        argv: ["{python}", "scripts/fn_kvq/bench.py", "--out", "{out}/kvq_bench.json"]
+        # 50 timed and 10 warm-up iterations per case plus the Triton compiles (estimate).
+        timeout_s: 90
+      # The kernel tests marked gpu, with the repository's marker and strictness; no cache
+      # folder is written into the tree.
+      - name: pytest_gpu
+        argv: ["{python}", "-m", "pytest", "-m", "gpu", "-q", "-rA", "-p", "no:cacheprovider",
+               "--strict-markers", "-o", "markers=gpu: needs a CUDA GPU", "--rootdir", "{tree}",
+               "tests/test_fn_kvq.py"]
+        timeout_s: 90
+  boots:
+    # A variant's cap from its start: A's cold boot (P5.2-07: 391 s, 265 of them the first
+    # graph shape's compiles) plus the teacher-forced pass (about 30 s), decode (about 25 s) and
+    # the DEV tasks (16,896 tokens at about 60 tok/s: about 290 s) is about 740 s.
+    budget_s: 900
+    # A variant starts only with this much before the run's stop: a boot and every
+    # measurement (a warm boot of about 150 s, the measurements about 345 s).
+    min_window_s: 600
+    # The health wait ends this long before the variant's deadline, so the pass and the decode
+    # runs still fit after a late boot.
+    measure_floor_s: 120
+    # The run's stop sits this far before end_s: the last boot's stop (SIGTERM, up to 60 s,
+    # SIGKILL, fn_probe.kill_server) and its log reading fit before the notebook's own end.
+    kill_reserve_s: 90
+    # Seconds the stop waits for the tagged processes, the port, and the GPUs to free.
+    stop_settle_s: 60
+    # A GPU still holding more than this above its reading before the boot is not free yet
+    # (P5.2-06: V2's ranks held 41,881 MiB 0.2 s after the kill); 2 GiB is above a dying CUDA
+    # context and far below a rank's 36 GB of weights.
+    gpu_free_mib: 2048
+    # Seconds between health polls (a crash shows within a second as the process's exit).
+    poll_s: 2
+    # Seconds after the last request before the liveness check (P5.2-05: a fault surfaced
+    # within 20 s of its prefill; 3 s catches one the last reply hid).
+    settle_s: 3
+  # Flags every boot adds before its own: one server seed for the sampled DEV tasks. A
+  # per-request sampling_seed needs --enable-deterministic-inference and the pytorch sampler
+  # (the fork's sampling_batch_info.py and sampler.py), which change the kernels being timed.
+  base_flags: {--random-seed: 0}
+  # Variables every boot starts from before its own (null removes one): the prompt
+  # log-probabilities in chunks of 256 rows (default 2,048: 2,048 rows x the vocabulary in FP32
+  # is about 2 GB, near the 3.35 GB P5.2-07 had free after its capture), the same in every boot,
+  # decode untouched; and none of the fragment's KV4 variables, so a boot is KV4 only by its own.
+  base_env: {SGLANG_LOGPROB_CHUNK_SIZE: "256", ARC26_KV4: null, ARC26_KV4_HADAMARD: null,
+             ARC26_KV4_GROUP: null}
+  measure:
+    # The teacher-forced pass: one long text, the same ids in every boot.
+    tf:
+      source:
+        # One record of P6.9-01's transcripts (the 27B's direct arm), fetched into the volume
+        # inside Modal (the job's input transcripts), never committed: its prompt holds an
+        # evaluation task's grids.
+        kind: transcript
+        input: transcripts
+        file: run_logs/direct_transcripts.jsonl
+        # The local pull of P6.9-01 (runs/P6.9-01/run_logs/direct_transcripts.jsonl).
+        sha256: e39ceadba15987e0e5754d707167baabecd6550bac288051964198e4b9213a12
+        # Not solved in P6.9-01 (its solves: 1818057f, 6e453dd6, a395ee82, b0039139, e8686506),
+        # so the text holds no correct answer; 5,636 prompt and 30,462 completion tokens by the
+        # 27B's count, so the cut below keeps the prompt and about 20k of reasoning.
+        attempt_id: 7c66cb00/p0/0
+      # The cut: inside the task's 20k to 30k band, under the 86,016 context.
+      max_tokens: 26000
+      # Top-20 per position for the entropy reading (the methods note's suggestion).
+      top_k: 20
+      # 26k tokens of prefill with logits at every position (estimate: under a minute).
+      timeout_s: 300
+      # Not started with less than this before the deadline.
+      min_s: 60
+    decode:
+      # The planner's 1 to 3 streams on L4.
+      streams: [1, 2, 3]
+      # 512 new tokens each, greedy, EOS ignored: about 8 s per run at 60 tok/s, with about a
+      # dozen of the server's decode lines (one per 40 steps).
+      max_tokens: 512
+      timeout_s: 120
+      min_s: 45
+      # Short prompts, one per stream, no competition data: the same prefixes in every boot.
+      prompts:
+        - "Each grid is rows of digits 0 to 9. The output grid is the input grid with every 1 replaced by 2. Input:\n0 1 0\n1 0 1\n0 1 0\nDescribe the rule, then write the output grid."
+        - "Each grid is rows of digits 0 to 9. The output grid is the input grid mirrored left to right. Input:\n1 2 3\n4 5 6\n7 8 9\nDescribe the rule, then write the output grid."
+        - "Each grid is rows of digits 0 to 9. The output grid is the input grid turned upside down. Input:\n3 0 0\n0 3 0\n0 0 3\nDescribe the rule, then write the output grid."
+    dev:
+      # The scored arm's request without the tool loop (its calls would add CPU time to the
+      # thinking length and differ between boots).
+      arm: plain
+      # Not started with less than this before the deadline (a cut length is not judged).
+      min_s: 120
+      # Thinking still running this long before the deadline is cut and forced.
+      force_reserve_s: 60
+  # The brief's pre-registered rules (section 1), applied by fn_kvab.judge.
+  readings:
+    # B's pool against A's: 4,224 against 6,912 B per token (scripts/fn_kvq/layout.py) is
+    # 1.636; under 1.6 the accounting lost more than 2%.
+    pool_ratio_min: 1.6
+    top1_min: 0.99
+    mean_abs_lp_max: 0.02
+    # The methods note: a 4-bit cache that flattens the distribution lengthens the thinking.
+    entropy_ratio_max: 1.05
+    # SGLang PR #38724 (MXFP4 KV on Qwen3.8-27B): 43% to 61% longer generations.
+    length_ratio_max: 1.20
+    # The length reading needs this many tasks with a length in both boots.
+    length_min_tasks: 2
+    decode_ratio_min: 0.95
+  variants:
+    # A: the baseline, P5.2-07's command line (engine.flags above) with the KV4 edits inert.
+    - name: a_fp8
+      role: baseline
+      why: FP8 KV, P5.2-07's flags; the KV4 edits applied but ARC26_KV4 unset
+    # B: K and V in INT4 with the Hadamard rotation. Its flags are A's: revision 16's
+    # --kv-cache-dtype fp8_e4m3 stays, and ARC26_KV4 makes the edits select the packed pool
+    # subclass and its quantize and read paths (configs/P5.5-01.yaml's header,
+    # docs/runbooks/fn_kvq.md section 3). Only the environment differs from A. Only after A.
+    - name: b_kv4
+      role: candidate
+      why: ARC26_KV4=1 (K and V INT4, groups of 32) with the Hadamard rotation
+      run_if: healthy:a_fp8
+      # The fragment's values (configs/P5.5-01.yaml engine.env): groups of 32, the rotation on.
+      # PYTHONPATH: the edits import fn_kvq, which the arc26 wheel does not carry; {kvq} is the
+      # bundle's scripts/ folder, extracted before the boots (fn_kvab.extract_bundle).
+      env: &kv4_env {ARC26_KV4: "1", ARC26_KV4_HADAMARD: "1", ARC26_KV4_GROUP: "32",
+                     PYTHONPATH: "{kvq}"}
+      # Every KV4 edit of the fragment must read applied in patches.json, or B would be A again
+      # (tests/test_fn_kvab.py keeps this list equal to the fragment's new items).
+      require_patches: &kv4_patches [kv4_backend_scratch_dim, kv4_backend_extract,
+                                     kv4_backend_extend_gather, kv4_backend_helpers,
+                                     kv4_pool_class_helper, kv4_pool_class, kv4_cell_size_helper,
+                                     kv4_cell_size, kv4_hybrid_v_head_dim]
+    # C when B passes on quality: B plus the vision-tower skip (research note fn_l4_memory.md,
+    # risk 5: language_model_only turns the multimodal rules off, which also re-enables the
+    # prefill graphs unless disabled explicitly). Its pool is read against B's: the tower's
+    # 0.42 GiB per GPU at TP 2 and the 0.10 GiB reserve are about +132,000 4-bit tokens at 4,224 B
+    # (+18% of B's expected 733,000).
+    - name: c_vision
+      role: candidate
+      why: B plus language_model_only (no vision tower), prefill graphs off explicitly
+      run_if: quality_pass:b_kv4
+      flags: {--json-model-override-args: {language_model_only: true},
+              --cuda-graph-backend-prefill: disabled}
+      env: *kv4_env
+      require_patches: *kv4_patches
+      pool_against: b_kv4
+      pool_ratio_min: 1.05
+      # The first boot dropped: it runs with 270 s left, so its boot gets 270 - measure_floor_s
+      # = 150 s (a warm boot: the load 66 s and the new kernels' compiles, estimate) and the pass
+      # (about 30) and decode (about 25) the rest; its DEV tasks run only with dev.min_s left,
+      # and a cut length is not judged. Expected: about 280 s left after B (the brief, 6).
+      min_window_s: 270
+    # C when B fails on quality: the V-only fallback (K FP8, V INT4: 1.24x, layout.py).
+    - name: c_vonly
+      role: candidate
+      why: ARC26_KV4=v (V only INT4, K FP8), the fallback when B misses on quality
+      run_if: quality_fail:b_kv4
+      env: {ARC26_KV4: "v", ARC26_KV4_HADAMARD: "1", ARC26_KV4_GROUP: "32", PYTHONPATH: "{kvq}"}
+      require_patches: *kv4_patches
+      pool_ratio_min: 1.2
+      # As c_vision's: its pool, pass and decode are the fallback's reading.
+      min_window_s: 270
+  # Lines of each boot's tail log (pulled), and the bounded copy of its whole log (head and tail
+  # kept): P5.2-07's boot wrote 1,365 lines, so 2 MB holds a whole boot.
+  tail_lines: 300
+  max_log_bytes: 2000000
+  # A fatal line (fn_bisect.first_error): P5.2-06's list.
+  error_patterns:
+    - "Scheduler hit an exception"
+    - "CUDA error"
+    - "illegal memory access"
+    - "Triton Error"
+    - "AcceleratorError"
+    - "CUDA out of memory"
+    - "NCCL error"
+    - "ncclInternalError|ncclUnhandledCudaError|ncclSystemError"
+    - "Fatal Python error"
+    - "Segmentation fault"
+    - "core dumped"
+    - ": error: argument"
+    - "^ValueError: "
+  # Never fatal: the fork's import of torchcodec without FFmpeg (P5.2-05's engine.log).
+  ignore_patterns:
+    - "torchcodec"
+    - "libavutil"
+    - "Ignore import error"
+  # Frames that only dispatch a launch: the deepest frame outside these is the launching call.
+  kernel_frame_skip:
+    - "/torch/nn/modules/"
+    - "/torch/_ops.py"
+    - "/torch/utils/"
+    - "/torch/_compile"
+    - "/torch/_dynamo/"
+    - "/triton/runtime/"
+    - "/triton/compiler/"
+    - "/triton/backends/"
+    - "/contextlib.py"
+  # What each row reads from its log (P5.2-07's lines): the load, the pool and its parts, the
+  # memory left after the pool and after the capture, the capture's time.
+  log_marks:
+    load_s: "Load weight end\\. elapsed=([\\d.]+) s"
+    weight_gb: "Load weight end\\.[^\\n]*?mem usage=([\\d.]+) GB"
+    kv_dtype: "KV Cache is allocated\\. dtype: ([\\w.]+)"
+    kv_tokens: "KV Cache is allocated\\.[^\\n]*?#tokens: (\\d+)"
+    k_size_gb: "KV Cache is allocated\\.[^\\n]*?K size: ([\\d.]+) GB"
+    v_size_gb: "KV Cache is allocated\\.[^\\n]*?V size: ([\\d.]+) GB"
+    pool_end_avail_gb: "Memory pool end\\. avail mem=([\\d.]+) GB"
+    capture_s: "Capture target decode CUDA graph end\\. elapsed=([\\d.]+) s"
+    after_capture_avail_gb: "available_gpu_mem=([\\d.]+) GB"
+    uvicorn: "Uvicorn running"
+
+smoke:
+  # The fake server with logprobs (fn_fake_kvab.py wraps fn_fake_sglang.py).
+  engine:
+    script: fn_fake_kvab.py
+  # Three of the smoke's tasks: the fake thinks past the cap on every second one, so the
+  # lengths read both "natural" and "cap".
+  solve:
+    task_ids: [s0000001, s0000002, s0000003]
+  # The smoke's text is synthetic (kvab.measure.tf.source): the fixture need not be found.
+  inputs:
+    transcripts: {path: /kaggle/input/notebooks/alyahya737/arc26-p6-3-shot,
+                  marker: run_logs/direct_transcripts.jsonl, required: false}
+  # Stand-ins for the kernel bundle (the smoke checks the path, not the kernels).
+  bundle:
+    files: [tests/testdata/fn_kvab/bench_stub.py, tests/testdata/fn_kvab/kvq_stub_checks.py]
+  kvab:
+    # Off in the smoke, whose variant s_patch_missing checks the per-variant path instead (the
+    # stop rule has its own test, tests/test_fn_kvab.py).
+    stop_if_unapplied: false
+    kernel_check:
+      enabled: true
+      bundle: fn_kvq.tar
+      gpu: "0"
+      budget_s: 60
+      pytest_path: null
+      max_log_bytes: 200000
+      commands:
+        - name: bench
+          argv: ["{python}", "tests/testdata/fn_kvab/bench_stub.py", "--out",
+                 "{out}/kvq_bench.json"]
+          timeout_s: 30
+        - name: pytest_gpu
+          argv: ["{python}", "-m", "pytest", "-m", "gpu", "-q", "-rA", "-p", "no:cacheprovider",
+                 "--strict-markers", "-o", "markers=gpu: needs a CUDA GPU", "--rootdir",
+                 "{tree}", "tests/testdata/fn_kvab/kvq_stub_checks.py"]
+          timeout_s: 30
+    # Short budgets: the fake boots in 0.3 s.
+    boots: {budget_s: 25, min_window_s: 8, measure_floor_s: 4, kill_reserve_s: 2,
+            stop_settle_s: 5, gpu_free_mib: 2048, poll_s: 0.2, settle_s: 0.2}
+    measure:
+      tf:
+        source: {kind: synthetic, text: "Each grid is rows of digits 0 to 9.\n0 1 2\n3 4 5\n",
+                 repeat: 40}
+        max_tokens: 1500
+        top_k: 20
+        timeout_s: 30
+        min_s: 2
+      decode:
+        streams: [1, 2, 3]
+        max_tokens: 64
+        timeout_s: 10
+        min_s: 1
+        prompts: ["Rule one: 0 1", "Rule two: 1 0", "Rule three: 1 1"]
+      dev: {arm: plain, min_s: 2, force_reserve_s: 1}
+    # The run's rules but decode: the fake's wall rates jitter by more than 5%.
+    readings: {pool_ratio_min: 1.6, top1_min: 0.99, mean_abs_lp_max: 0.02,
+               entropy_ratio_max: 1.05, length_ratio_max: 1.20, length_min_tasks: 2,
+               decode_ratio_min: 0.5}
+    # One variant per path of fn_kvab.boot_variant and run_if (modal_ops.KVAB_SMOKE_WANT), with
+    # the run's settings: the fake scales its pool by ARC26_KV4 and the vision key
+    # (fn_fake_kvab.pool_argv), so B is 1.7x A and C 1.18x B.
+    variants:
+      - {name: a_fp8, role: baseline, why: the baseline on the fake}
+      - {name: b_kv4, role: candidate, why: "the fake 4-bit cache (shifted logprobs, a 1.7x pool)",
+         run_if: "healthy:a_fp8", env: {ARC26_KV4: "1", PYTHONPATH: "{kvq}"}}
+      - {name: c_vision, role: candidate, why: chosen by B's quality pass,
+         run_if: "quality_pass:b_kv4",
+         flags: {--json-model-override-args: {language_model_only: true},
+                 --cuda-graph-backend-prefill: disabled},
+         env: {ARC26_KV4: "1", PYTHONPATH: "{kvq}"}, pool_against: b_kv4, pool_ratio_min: 1.05,
+         min_window_s: 4}
+      - {name: c_vonly, role: candidate, why: skipped by B's quality pass,
+         run_if: "quality_fail:b_kv4", env: {ARC26_KV4: "v", PYTHONPATH: "{kvq}"},
+         min_window_s: 4}
+      - {name: s_refused_flag, role: candidate, why: the fake refuses the value at boot,
+         flags: {--fake-pool: not-a-number}, min_window_s: 4}
+      - {name: s_patch_missing, role: candidate, why: an edit B needs is not applied,
+         require_patches: [kv4_absent], min_window_s: 4}

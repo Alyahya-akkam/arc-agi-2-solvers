@@ -1,0 +1,198 @@
+# Submission notebook build for run P5.1-01 (task P5.1, docs/tasks/P5.1.md): LLM first, version 10.
+# Version 9 (configs/submission_P4.7-02.yaml, arc26-submission version 9) without NVARC and
+# without the rank-256 tail: agent.skip_nvarc true (when the agent check passes, in both modes, the
+# Run cell starts no NVARC and the Write cell writes [[0]] placeholders), no agent.tail,
+# agent.config configs/agent_shot_P5.1.yaml (the shot on every task, the smallest opening first,
+# 20 streams, cap 65,536, the planner's rate 30), the weights' warm-up from the agent check at
+# once (no NVARC model loads to wait for), min_stage_s from the new shot arithmetic, its own code
+# dataset, and a 3-task development subset so this version's own Kaggle run is a short check. A
+# competition rerun ignores the subset and runs the shot on every hidden test task from about
+# 560 s to the generation stop at 39,930 s. Read by scripts/build_submission.py and
+# scripts/build_kaggle_notebook.py with yaml.safe_load; runbook docs/runbooks/build_submission.md
+# ("LLM first"); pre-run brief docs/prerun/P5.1-01.md. Fit to submit: the submission notebook,
+# four workers on NvidiaL4 (NVARC's, used only when the agent check fails), no series, the shot at
+# the rerun's times. tests/test_p5_1.py checks it against version 9's.
+
+# The one notebook submissions come from (docs/SUBMITTING.md): this run's version is the
+# leaderboard test of its brief; every earlier submitted version stays submittable.
+kaggle_notebook: alyahya737/arc26-submission
+
+# This build's own code dataset (the human, 9 Oct: one code dataset per concurrent build lineage;
+# the task brief's name): the wheel is new (arc26/agent/shot.py's selection.order opening and
+# waves.dev_cap), and versions 6 to 9 keep reading alyahya737/arc26-code-p69 as they were built.
+code_dataset: alyahya737/arc26-code-p51
+
+# Competition attached: it mounts the data, and only notebooks attached to it get 4xL4.
+competition: arc-prize-2026-arc-agi-2
+
+# 4xL4: NVARC's four workers (bf16, compute capability 8.9), then the engine's tensor parallelism
+# 4 (the INT4 27B needs it); the scored rerun's hardware. No fallback (NvidiaL4X1 runs on a T4,
+# which has no bf16).
+accelerator: NvidiaL4
+
+# Same pinned image and install notebook source as every build (ADR-010); the engine runs from its
+# own venv with the image's PYTHONPATH removed.
+reference_metadata: reference/kernel-metadata.json
+
+# Same install notebook version as every build (see configs/submission_P0.5-01.yaml).
+kernel_source_versions:
+  sorokin/pip-install-unsloth-flash-patch: 2
+
+# Same model folder name as every build (K0): NVARC's base model.
+model_slug: qwen3_4b_grids15_sft139
+
+# Three DEV120 tasks for this version's own development run, a short check (task P5.1): the 27B
+# solved all three in P6.9-01 (docs/experiments/P6.9-01.md: 1818057f, 6e453dd6, e8686506, the
+# three NVARC solves at confidence 0.85 or more that the shot solved too), so their prompts and
+# replies are known to parse. At waves.dev_cap 16,384 they may not be solved again (the solves
+# ended their turns at 24,137 to 68,021 tokens); the check reads health, not score.
+# Development runs only: the agent stage applies it only outside a competition rerun (SUBSET and
+# not COMPETITION).
+subset: ["1818057f", "6e453dd6", "e8686506"]
+
+# One worker per L4, as P2.6-01 and the scored rerun (production: submission_blocker); NVARC runs
+# only when the agent check fails.
+workers: 4
+
+# Same PYTHONHASHSEED as P2.6-01 and every run since run A: one fixed seed for all comparisons.
+hash_seed: 0
+
+# A development run may run NVARC (as a competition rerun always may): when the agent check passes,
+# agent.skip_nvarc skips it in both modes; when it fails, NVARC runs alone, as version 9 would.
+run_solver: true
+
+# Seconds after the start: NVARC's soft deadline, the competition value (12 h minus 30 min), as
+# P2.6-01: the shot never cuts NVARC (design 1), so this run measures the rerun's NVARC timing.
+solver_end_s: 41400
+
+# Seconds after the start: NVARC's hard stop, the competition value (12 h minus 20 min), as
+# P2.6-01.
+solver_kill_s: 42000
+
+# The split solver (ADR-011, the default since 2 Oct), as P2.6-01: Submission 2's NVARC.
+solver: split
+
+# NVARC's LoRA scope in both modes, P2.6-01's (task P2.6, ADR-018): P1.3-01 arm 2 (r16-attn),
+# 38.33 of 120 on DEV120 in P2.6-01 at 499.5 s per puzzle.
+scope:
+  # Rank 16, rsLoRA scale alpha / sqrt(r) = 32 / 4 = 8 (the reference's alpha of 32).
+  lora_r: 16
+  # q, k, v, o on all 36 layers; embed_tokens and lm_head frozen (P1.3-01 arm 2, H's scope).
+  lora_targets: [q_proj, k_proj, v_proj, o_proj]
+
+# The agent stage as the long shot on every task (tasks P6.5b and P5.1), in both modes. Seconds
+# count from the notebook's start. With the agent check passed NVARC does not run, so the stage
+# starts after the environment check, the agent check, the install, and the Write cell (about 100
+# s); the shot's own setup (the wheelhouse install, the engine preparation, the preflight, the
+# boot from the warmed copy, the sanity request: about 460 s, P6.9-05 and P4.7-02) puts its first
+# start near 560 s, and it refills its 20 streams until the time left no longer allows the full
+# cap (configs/agent_shot_P5.1.yaml), up to the generation stop at 39,930 s.
+agent:
+  # On: the stage runs when the agent check passes. The Config cell's AGENT['enabled'] can turn it
+  # off for a version without rebuilding (NVARC then runs alone, as Submission 2).
+  enabled: true
+  # The module the stage runs: P6.3-05's long shot, with arc26.agent.run's arguments and exit
+  # codes (docs/modules/agent_shot.md).
+  entry: arc26.agent.shot
+  # The competition soft deadline, as every shot build (the builder requires it): NVARC's deadlines
+  # stay whole in the one case it runs, a failed agent check (then the agent stage is skipped).
+  nvarc_share_s: 41400
+  # The shot's session end, its --deadline: 12 h less the 45 min allowance for the time Kaggle
+  # may count before the first cell (P6.5-02: RUNNING 36.7 min before it; P6.3-02 revision 5: 41
+  # min) less term_s, the kill wait, and the write reserve: 43,200 - 2,700 - 120 - 30 - 300 =
+  # 40,050 s, so the notebook's last line comes by 40,500 s of notebook time (about 40,100 s
+  # expected). Generation stops final_margin_s (120 s, configs/agent_shot.yaml) earlier, at
+  # 39,930 s. The allowance applies to the shot only: NVARC keeps 41,400 and 42,000 s.
+  end_s: 40050
+  # Seconds between SIGTERM and SIGKILL of the shot at end_s: on SIGTERM it cancels its calls,
+  # stops its engine (stop_timeout_s 60 s, then SIGKILL and arc26.agent.server's 30 s wait for the
+  # group) and writes once more (under a second), about 95 s with the drain; 120 s covers that. An
+  # engine still alive after SIGKILL is stopped by the notebook through engine.pid (its group).
+  term_s: 120
+  # The stage runs the shot only with this much left before the generation stop: the install
+  # (106 s in P6.3-05, plus 30%: 138 s), the GPU wait's cap (60 s), and the shot's min_shot_s
+  # (arc26.agent.shot.stage_arithmetic of configs/agent_shot_P5.1.yaml: setup_s 450 s and one
+  # start at C = 65,536 planned at 20 streams, T = C / (0.85 * 30) + 20 (6,771 + C) / 958.8 +
+  # 6,144 / 30 + 300 = 4,583.1 s; 5,033.1 s in all): 5,231.1 s, rounded up. With no NVARC the
+  # stage starts near 100 s, so only an edited AGENT could make it bind.
+  min_stage_s: 5300
+  # Seconds for the offline install of the wheelhouse: P6.3-05's limit (configs/P6.3-05.yaml,
+  # wheels.timeout_s), 5.7 times its 106 s; it is also cut at the generation stop.
+  install_timeout_s: 600
+  # Task P5.1's shot: version 8's (configs/agent_shot_P6.9e.yaml) with the queue of every task by
+  # opening, 20 streams, cap 65,536, the planner's rate 30, and a development cap of 16,384.
+  # Embedded in the notebook, its sha256 in BUILD.
+  config: configs/agent_shot_P5.1.yaml
+  # The weights' warm-up (task P6.9c, docs/prerun/P6.9-03.md): at the agent check, a background
+  # process copies the 12 files (19,472,990,100 bytes, P6.9-02's agent check) from
+  # their input mount to scratch_dir/weights/qwen38-27b-int4 and checks each at its size and its
+  # sha256 against the output's MANIFEST.json; the engine loads the verified copy, else the input
+  # with the fallback below. In both modes.
+  warmup:
+    # Seconds before the copy starts: none. Version 9's 180 s left NVARC's four model loads the
+    # mounts; without NVARC the copy (41.5 s at 469.2 MB/s, the check 65.3 s: P4.7-02's
+    # warmup.json) runs beside the arc26 install and the Write cell and ends before the agent
+    # stage's wheelhouse install does (114 to 145 s), so the engine boots from local disk.
+    delay_s: 0
+    # Parallel readers: the 18.6 GB model.safetensors is 70 pieces of 256 MiB, each read in order
+    # through a handle of its own; vLLM's own prefetch reads it with one thread (weight_utils.py,
+    # sorted_files[rank::world_size], 2 files over 4 ranks).
+    workers: 8
+    # MiB per piece: few enough pieces to keep each read long and sequential, enough to keep 8
+    # readers busy to the end.
+    piece_mib: 256
+    # CPU niceness of the copier: the lowest priority, as version 9, so the arc26 and wheelhouse
+    # installs it runs beside keep the CPUs.
+    nice: 19
+    # Seconds between the copier's status writes: about 4 times in each 2-minute stall window.
+    progress_s: 30
+    # GB that must stay free in scratch beside the copy: the engine's venv (about 10 GB), its
+    # caches, and NVARC's copies; P6.9-02's scratch had 1,126 GB free.
+    reserve_gb: 40
+    # Most seconds the agent stage waits, after the install, for a copy still making progress:
+    # the boot limit (configs/agent_shot_P6.9e.yaml, server.boot_timeout_s 900, P6.9's); a
+    # fallback that reads the same bytes from the same mount through fewer readers cannot end
+    # sooner.
+    wait_s: 900
+    # Seconds without a byte copied or hashed after which the copy counts as stalled and the
+    # engine falls back: 4 status writes.
+    stall_s: 120
+    # vLLM 0.31.0's --safetensors-load-strategy for a load from the input mount: the page-cache
+    # prefetch its log line names for a filesystem it does not recognize as network storage
+    # (vllm/model_executor/model_loader/weight_utils.py, lines 1063 to 1116, at db9527a4).
+    fallback_load_strategy: prefetch
+  # The weights: the download notebook's output, as P6.3-05 attached it.
+  model:
+    # The notebook that downloaded and verified RedHatAI/Qwen3.8-27B-INT4 (ADR-020, decision 6).
+    notebook: alyahya737/arc26-dl-qwen38-int4
+    # Its first run's output, P6.3-05's.
+    version: 1
+    # The folder of that output holding the 12 repository files; vLLM loads it from the mount.
+    folder: qwen38-27b-int4
+    # The revision the download verified; its MANIFEST.json must name it.
+    revision: 91bd022d5b49442a868bc35008f6c21e1860edfa
+  # The engine: the wheels notebook's output, as P6.3-05 attached it.
+  wheels:
+    # The notebook that downloaded vLLM 0.31.0 and its closure as wheels for Python 3.11.
+    notebook: alyahya737/arc26-dl-agent-wheels
+    # Its first run's output, P6.3-05's.
+    version: 1
+    # The folder holding the wheels, their MANIFEST.json, and install_wheelhouse.py.
+    folder: wheelhouse
+    # The engine version its MANIFEST.json must list (ADR-020; models note, section 4.1).
+    vllm: 0.31.0
+  # The interpreter that makes the engine's venv: the image's Python 3.11.13, P6.3-05's
+  # (configs/P6.3-05.yaml, wheels.base_python); the kernel's own when missing.
+  base_python: /usr/bin/python3.11
+  # Scratch for the venv (about 10 GB), the engine's caches (configs/agent_shot.yaml, server.env),
+  # NVARC's copies, and the shot's logs: /tmp had about 1.1 TB free in every probe (K0).
+  scratch_dir: /tmp/arc26-agent
+  # The oldest NVIDIA driver for the engine's CUDA 13.0 runtime (torch 2.13 cu130); Kaggle's L4
+  # sessions reported 580.159.04 and 580.178.04.
+  min_driver: 580.65.06
+  # LLM first (task P5.1): when the agent check passes, in both modes, NVARC's solver does not
+  # run and the Write cell runs no selection, so submission.json holds [[0]] placeholders until
+  # the shot rewrites it; a task the shot does not reach keeps them. No rank-256 tail (it needs
+  # NVARC's rank-16 confidence; the builder refuses both together). A failed agent check runs
+  # NVARC alone with its full deadlines, as version 9.
+  skip_nvarc: true

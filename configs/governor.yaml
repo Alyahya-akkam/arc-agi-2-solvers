@@ -1,0 +1,87 @@
+# Time governor of the refinement loop (BRIEF B5 P2.4; arc26/governor.py, docs/modules/governor.md).
+# Read with yaml.safe_load by CostModel.from_config and Governor.from_config. Coefficients come
+# from run P1.1-01 (DEV120, 120 tasks, 4xL4): reports/P1.1-01/summary.md and the records
+# reports/P1.1-01/timing-rank*.jsonl it was written from. tests/test_governor.py checks every
+# coefficient against its report row and recomputes it from the records, so a corrected report
+# fails the test until this file follows it. Line numbers below are summary.md's unless named.
+
+provenance:
+  run_id: P1.1-01
+  # Code commit of the run (line 3).
+  run_code_commit: d94304df3b805ffd4c747e4bd7babc7d6774922e
+  # Commit of task/P1.1-timing that added the attention train model (line 90).
+  report_commit: 761e10f
+  hardware: 4xL4 (NvidiaL4), one worker per GPU
+  # Fit statistics of the train model (line 90).
+  train_fit: {r2: 0.998, n: 120}
+  # Samples behind the decode and selection quantiles (lines 48 and 49).
+  decode_batches: {n: 669}
+  selection_candidates: {n: 1181}
+
+ops:
+  train:
+    # Seconds of one fit of T tokens in `steps` optimizer steps: a + b T + c T^2 / steps, the
+    # attention model of the P1.1-01 report (line 90; docs/experiments/P1.1-01.md line 145):
+    # R^2 0.998, n 120. Its source is the reviewer's correction relayed by the orchestrator on
+    # 1 Oct; the linear fit (line 89; reports/P1.1-01/timing_table.md line 148) has R^2 0.988 and
+    # a worst residual of 62.4 s, and would need c = 0 with its own a = -7.06 and b = 0.000798.
+    a: 24.35
+    b: 0.0005812
+    c: 3.487e-08
+    # Steps of the fit that the T^2 term divides by, when the caller passes none: the reference's
+    # 128 (one epoch on 16 color permutations of the 8 dihedral views; line 104). A round's
+    # sgd_continue passes its own.
+    steps: 128
+    # Seconds added to every fit: the model's worst residual, 22.1 s (puzzle 5961cc34; line 90).
+    allowance: 22.1
+  decode:
+    # Seconds per DFS batch (one inference_turbo_dfs call on 4 augmented views): the p90 of the
+    # 669 batches, 143.9 s (line 48; mean 66.8, max 269.9). No token axis: P1.1-01 logged no
+    # decode tokens, and on K0's cells proxy a line explains R^2 0.243 per batch (line 80).
+    seconds: 143.9
+  selection:
+    # Seconds per rescored candidate (two calc_scores calls on 8 views): the p90 of the 1181
+    # candidates, 7.8 s (line 49). No token axis: P1.1-01 logged no selection tokens. Unlike
+    # decode, a line on K0's cells proxy fits it well (R^2 0.900, line 81); the quantile stays
+    # until P0.3b logs selection tokens, and times 4 candidates per batch it prices 31.2 s of
+    # rescoring per batch against a measured p90 of 20.6 s per batch (the records).
+    seconds: 7.8
+
+# Rescored candidates per decode batch, priced before the caller can count them: 4. The p90 of
+# distinct grids per test output is 13 (line 214), over the reference's 4 batches per test output
+# 3.25, rounded up. The records give the same p90 of rescored candidates per batch (mean 1.77).
+candidates_per_batch: 4
+
+# Seconds per round outside train, decode, and selection (dataset build, adapter swap): the
+# largest per-puzzle overhead, 9.6 s (line 43).
+overhead: 9.6
+
+# Multiplicative margin m: every estimate is (1 + m) times the conservative cost above. Priced
+# with these coefficients as a round of its own T and decode batches, 8 of the 120 P1.1-01
+# puzzles take longer than the estimate at m = 0; the worst takes 1.302 times it (7b0280bc: four
+# batches of 177 to 266 s; a puzzle's batches are correlated). m = 0.35 covers all 120
+# (tests/test_governor.py recomputes this). In the tests' simulator, 400 runs per setting, no
+# worker passed the deadline with true costs up to 1.3 times the model and at most 0.16% of the
+# rounds cost more than their estimate; with m = 0 up to 1.25% did, and runs near capacity passed
+# the deadline by up to 594 s (docs/modules/governor.md, "Margin").
+margin: 0.35
+
+deadline:
+  # Seconds after the notebook start when the workers stop: 12 h minus 30 min, the solver end
+  # time of a competition rerun (scripts/build_kaggle_notebook.py line 92,
+  # COMPETITION_SOLVER_END_S; configs/submission_P1.1-01.yaml line 45). The loop passes the
+  # solver's end time to Governor; this value records the offset and the test checks it.
+  end_s: 41400
+  # Straggler reserve: seconds before the deadline that no round may use. 0 is the brief's
+  # budget formula. In the tests' simulator no worker passed the deadline without a reserve,
+  # and a reserve of one longest P1.1-01 puzzle (1380.7 s, line 44) cost 7% to 46% of the rounds
+  # (120 to 240 tasks; docs/modules/governor.md, "Stragglers"). The human may raise it at G1.
+  reserve_s: 0
+
+decode_policy:
+  # reference: never cut the baseline's decode batches (the default until G1). trade: stop the
+  # baseline decode early to make room for a round (B7 G1's 90% branch); the human sets it at G1.
+  mode: reference
+  # Under trade, the fewest baseline decode batches kept per test input: 2 of the reference's 4,
+  # the batches it runs first for every test input (its 8 views without a transpose).
+  min_batches_per_input: 2

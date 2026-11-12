@@ -1,0 +1,38 @@
+# Optional P5.8-02: isolate six clients and lazy recurrent-state allocation with vision ON.
+# This is a proposed measurement only. No automatic adoption or launch is authorized here.
+extends: configs/P5.2-01.yaml
+run_id: P5.8-02
+kernel:
+  # Own private notebook and immutable code dataset preserve the approved harness run.
+  id: alyahya737/arc26-p58-sixstream
+  title: arc26 p58 sixstream
+  code_dataset: alyahya737/arc26-code-fn-p582
+  # Same development hard bound as P5.8-01: 125 min, at most 4.17 quota h at 2x.
+  timeout_s: 7500
+inputs:
+  code:
+    path: /kaggle/input/datasets/alyahya737/arc26-code-fn-p582
+    hint: [arc26-code-fn-p582]
+engine:
+  flags:
+    # C of P5.6-03 measured this strategy with vision enabled; its altered slot counts below
+    # have NOT been measured. Keep the existing weights, precision and all prefill choices.
+    --mamba-radix-cache-strategy: extra_buffer_lazy
+    # Preserve the measured conservative headroom setting; no vision-skip override is added.
+    --mem-fraction-static: 0.95
+    # Six clients plus one server slot avoid the chunked-prefill admission latch (N+1).
+    --max-running-requests: 7
+    # The clean-C skip-lock/lazy ratio is three slots per running request: 3 x 7 = 21.
+    # Relative C's 29 slots, 8 fewer at an estimated 3,482 KV4 tokens each suggests
+    # 243,712 + 8 x 3,482 = 271,568 pool tokens. This is NOT a measurement.
+    --max-mamba-cache-size: 21
+    # Cover every client batch through six without spending memory on unused batch eight.
+    --cuda-graph-max-bs-decode: 6
+    --cuda-graph-bs-decode: [1, 2, 3, 4, 5, 6]
+  env:
+    # C's sole environment change: do not copy B's vision-skip/VLM-cache changes.
+    SGLANG_OPT_MAMBA_SKIP_DECODE_LOCK: "1"
+solve:
+  # All task IDs, cap, forcing allocation and planner floor stay version 18's; the measured
+  # pool determines whether six streams actually fit while keeping minimum thinking 29k.
+  max_streams: 6

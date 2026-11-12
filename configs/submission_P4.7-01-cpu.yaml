@@ -1,0 +1,56 @@
+# Submission notebook build for the Kaggle CPU check of P4.7-01's build (task P4.7, task id
+# P4.7-01-cpu): configs/submission_P4.7-01.yaml on CPU with the CPU checks' launch probe, so the
+# four values every CPU check changes (notebook, accelerator, workers, deadlines) are the only
+# differences (a test checks them). It proves on Kaggle, without GPU quota, before the GPU push:
+# the image, the mounts, the offline install of wheel a5bb333f from arc26-code-p69, the Config
+# cell without SCOPE or AGENT, the split solver's start with RunConfig's defaults (the reference's
+# LoRA settings) on the 8-task subset, make_submission, the validator, and run_logs. Read by
+# scripts/build_submission.py and scripts/build_kaggle_notebook.py with yaml.safe_load; runbook
+# docs/runbooks/build_submission.md ("A rank-256 pass on rank 16's confidence-0 tasks"). Not fit
+# to submit (no accelerator, one worker, not the submission notebook).
+
+# The CPU check's own notebook (P0.5-cpu's and every twin's since), named in no pre-run brief: the
+# gateway refuses CPU pushes to a briefed notebook, since Kaggle may keep a slug's accelerator.
+kaggle_notebook: alyahya737/arc26-submission-cpu-check
+
+# The GPU build's code dataset, so the twin installs the wheel the GPU run installs.
+code_dataset: alyahya737/arc26-code-p69
+
+# Competition attached: it mounts the data the notebook searches for.
+competition: arc-prize-2026-arc-agi-2
+
+# No accelerator: a CPU session spends no GPU quota and needs no pre-run brief (BRIEF A9); the
+# notebook then requires no GPU, and MANIFEST.md marks the build unfit to submit.
+accelerator: null
+
+# Same pinned image and install notebook source as the GPU build (ADR-010).
+reference_metadata: reference/kernel-metadata.json
+
+# Same install notebook version as the GPU build (see configs/submission_P0.5-01.yaml).
+kernel_source_versions:
+  sorokin/pip-install-unsloth-flash-patch: 2
+
+# Same model folder name as the GPU build: the check proves the model is found.
+model_slug: qwen3_4b_grids15_sft139
+
+# The GPU build's 8 tasks, so the twin queues exactly the run's tasks; the probe's worker fails at
+# unsloth before it reads one, and the development scoring then raises on no candidates (expected).
+subset: ["136b0064", "291dc1e1", "581f7754", "65b59efc", "6ffbe589", "80a900e0", "9385bd28", "e12f9a14"]
+
+# One worker, as the CPU checks: the probe spawns exactly one process.
+workers: 1
+
+# Same PYTHONHASHSEED as the GPU build and every run since run A.
+hash_seed: 0
+
+# The launch probe: the solver starts and its worker stops at unsloth for lack of a GPU.
+run_solver: true
+
+# Seconds after the start, the CPU checks': the lowest soft deadline the builder accepts.
+solver_end_s: 600
+
+# Seconds after the start, the CPU checks' hard stop: far more than a failing import needs.
+solver_kill_s: 660
+
+# The split solver, as the GPU build.
+solver: split

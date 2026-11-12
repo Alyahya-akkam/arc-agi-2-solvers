@@ -1,0 +1,69 @@
+# Script notebook build of run MT-04, the third and last session of H's meta-training (task MT,
+# amendment of 4 Oct): MT-03's build with MT-03's output attached and resumed from instead of
+# MT-02's, nothing else (tests/test_notebook_local_mt.py checks it). MT-02 revision 2 was capped
+# by the week's quota, so two full sessions no longer hold the 5,600 steps; this one finishes the
+# cosine. Read by scripts/build_submission.py and scripts/build_kaggle_notebook.py; runbook
+# docs/runbooks/train_hypernet.md (resuming across sessions); pre-run brief docs/prerun/MT-04.md.
+
+# A script config (task P0.5d): the notebook runs one script, never the solver, and is never
+# submitted.
+kind: script
+
+# A third notebook of task MT: Kaggle refuses a notebook's own output (invalidKernelSources), and
+# the builder refuses a config that attaches its own notebook, so this resume runs here.
+kaggle_notebook: alyahya737/arc26-mt-train-3
+
+# Meta-training's own private code dataset, the same version as MT-02's and MT-03's (version 2):
+# the same wheel, script, and config bytes, so the same RESUME_KEYS values, which a resume needs.
+code_dataset: alyahya737/arc26-code-mt
+
+# Same competition as every build: the environment check expects the mount.
+competition: arc-prize-2026-arc-agi-2
+
+# 4xL4, as MT-02 and MT-03: a resume needs the same world size (four processes).
+accelerator: NvidiaL4
+
+# Same pinned image and model as every build (MT-02's stack).
+reference_metadata: reference/kernel-metadata.json
+
+# Same install notebook version as every build (configs/submission_P0.5-01.yaml).
+kernel_source_versions:
+  sorokin/pip-install-unsloth-flash-patch: 2
+
+# Same model folder name as every build: the environment check finds the base by it.
+model_slug: qwen3_4b_grids15_sft139
+
+# MT-02's inputs, plus MT-03's output, version 1: its checkpoints folder holds latest.json and the
+# two newest full checkpoints (and best.pt if MT-03 reached a new low). MT-02's output is not
+# needed to resume (every input must be passed in args; best.pt stays where its session wrote it).
+notebook_inputs:
+  alyahya737/arc26-p3-4-episodes: 2
+  alyahya737/arc26-p3-4-leakage: 2
+  alyahya737/arc26-mt-cache: 1
+  alyahya737/arc26-mt-train-2: 1
+
+# The training script, the same bytes as MT-02's and MT-03's.
+script: scripts/train_hypernet.py
+
+# MT-02's and MT-03's config, the same bytes: the resume refuses another value of any RESUME_KEYS
+# setting.
+script_config: configs/train_hypernet_MT.yaml
+
+# MT-03's arguments with MT-03's checkpoints folder: the script reads its latest.json and
+# continues from that step, data cursor, optimizer, and RNG states, under the config's full budget
+# (41,400 s), more than the steps left need (brief MT-04, section 6).
+args:
+  - --commit
+  - "{commit}"
+  - --episodes-root
+  - "{input:alyahya737/arc26-p3-4-episodes}"
+  - --check-root
+  - "{input:alyahya737/arc26-p3-4-leakage}"
+  - --embedding-cache
+  - "{input:alyahya737/arc26-mt-cache}/embedding_cache"
+  - --resume
+  - "{input:alyahya737/arc26-mt-train-2}/checkpoints"
+
+# MT-03's hard stop (a full session's: the script's budget ends about 41,613 s in, 687 s before
+# this). The brief's Timeout is this plus 300 s, 42,600 s.
+script_kill_s: 42300

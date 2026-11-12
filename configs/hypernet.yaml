@@ -1,0 +1,59 @@
+# Hypernetwork H, task P3.3 (BRIEF B2 Q1 and Q2, B5 P3.3; ADR-002). Read by
+# arc26.hyper.hypernet.HypernetConfig.from_yaml, which refuses missing and unknown keys. The
+# projection shapes are not here: H reads them from the base's own config
+# (BaseShapes.from_config(model.config)). Derivations: docs/modules/hypernet.md; T2L numbers:
+# docs/research/d2l_t2l_reading.md, section 2 ("research note" below).
+
+# Width of the task embedding z_bar. P3.2 mean-pools hidden states of the frozen base itself
+# (ADR-001), so this is the base's hidden size, 2560 for Qwen3-4B.
+embed_dim: 2560
+
+# Trunk width d. T2L's larger setting (research note, section 2). The whole trunk is 8.8M
+# parameters at this width; the heads hold the other 126.2M.
+latent: 512
+
+# Head input width H_in. Each head holds (H_in + 1) r (d_in + d_out) parameters, so H_in sets the
+# budget: 384 gives 134,958,208 parameters for the default scope, under the 150M cap of B5 P3.3;
+# 512 would give 177.2M (research note). G2's expansions stay under the cap only with a smaller
+# H_in (at most 214 at r = 32, 153 with MLP modules; docs/modules/hypernet.md).
+head_in: 384
+
+# Dropout in the trunk, T2L's value (research note, section 2). Active in training mode only;
+# P4.1 runs H in eval mode, so the emitted adapter is deterministic.
+dropout: 0.05
+
+# LoRA rank r of every emitted pair (Q2, ADR-002): 11,796,480 emitted values per adapter on
+# q, k, v, o. G2 may raise it to 32 after P1.3 (with H_in at most 214).
+rank: 16
+
+# LoRA alpha, as in the notebook (Q2). rsLoRA scale alpha / sqrt(r) = 8 from
+# inject.rslora_scaling, the one scale for injection and PEFT export.
+alpha: 32
+
+# Projections adapted in every decoder layer (Q2, ADR-002). The first G2 expansion adds
+# gate_proj, up_proj, down_proj (keys layers.{i}.mlp.{m}); no code change.
+target_modules: [q_proj, k_proj, v_proj, o_proj]
+
+# Seed of H's initialization (trunk weights and the PEFT-style A_0 in the head biases): one fixed
+# seed for all comparisons (CLAUDE.md).
+seed: 0
+
+# How H reads the demonstration set (P3.3b; scoping note docs/research/h_upgrades_scoping.md,
+# section 1(a); ADR-001 amendment). Optional: a config or checkpoint without this block is the
+# mean H, and a block equal to these defaults is left out of the checkpoint's config, so every
+# checkpoint before P3.3b loads, runs, and resumes unchanged (ADR-017 decision 7).
+aggregator:
+  # mean: the task code reads z_bar only, H as trained by MT-02 and MT-03 (bit for bit). set: a
+  # Set Transformer over the pair embeddings adds W_o c_{m,l} to the task code of each (module,
+  # layer) row, W_o = 0 at init, so a warm start (--init-from) begins exactly at the loaded H.
+  # The default stays mean until a pilot (P3.3-01) reads Good.
+  kind: mean
+  # Width d_s of the set tokens and the attention: the trunk width d (latent), as the scoping
+  # note's design; 2 blocks then add 8,877,824 parameters (H 143,836,032, under B5 P3.3's 150M).
+  width: 512
+  # Pre-LN self-attention blocks over the pairs. 2: about 10 pairs per task at most, so a small
+  # aggregator suffices; 3 gives 146,988,416, 4 would pass the 150M cap (150,140,800).
+  blocks: 2
+  # Attention heads of every block and of the pooling: 64 channels per head at width 512, the
+  # head width of the Set Transformer's and T2L's attention settings; any divisor of width works.
+  heads: 8

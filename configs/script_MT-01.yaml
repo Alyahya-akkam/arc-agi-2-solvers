@@ -1,0 +1,69 @@
+# Script notebook build of run MT-01, the 8-view embedding cache of every distinct demonstration
+# pair of P3.4's training and validation episodes (task MT; BRIEF A8, A9). Read by
+# scripts/build_submission.py and scripts/build_kaggle_notebook.py with yaml.safe_load; runbooks
+# docs/runbooks/build_submission.md (script mode) and docs/runbooks/cache_embeddings.md; pre-run
+# brief docs/prerun/MT-01.md.
+
+# A script config (task P0.5d): the notebook runs one script, never the solver, and is never
+# submitted.
+kind: script
+
+# A new notebook of task MT (each slug belongs to one task branch, docs/prerun/README.md). Its
+# output, the cache, is what MT-02 attaches (configs/script_MT-02.yaml pins its version 1).
+kaggle_notebook: alyahya737/arc26-mt-cache
+
+# Meta-training's own private code dataset (task MT): solver runs share alyahya737/arc26-code,
+# which cannot take a new version while a run expecting the current one waits or runs, so the
+# MT runs and the solver runs never wait on each other's versions. One version holds the wheel
+# and the three MT runs' scripts and configs (each notebook takes its two files by name).
+code_dataset: alyahya737/arc26-code-mt
+
+# Same competition as every build: the environment check expects the mount; the run reads none of
+# its files.
+competition: arc-prize-2026-arc-agi-2
+
+# 4xL4, one encoding process per GPU (cache_embeddings_MT-01.yaml, gpus 4). bf16 rules out T4,
+# and NvidiaL4X1 ran on 2xT4 when requested (P0.3-01); the bf16 stop refuses such a session.
+accelerator: NvidiaL4
+
+# Same pinned image and model as every build: the stack P3.2-02 measured the encoder on (torch
+# 2.8.0, transformers 4.55.4).
+reference_metadata: reference/kernel-metadata.json
+
+# Same install notebook version as every build (configs/submission_P0.5-01.yaml).
+kernel_source_versions:
+  sorokin/pip-install-unsloth-flash-patch: 2
+
+# Same model folder name as every build: the environment check finds the base by it, and the
+# script by the end of its path (model_id in its config).
+model_slug: qwen3_4b_grids15_sft139
+
+# P3.4's builder output version 2 (the episodes, manifest b1f2cd04...) and its checker output
+# version 2 (leakage.json with "pass": true for that manifest), as P3.5-01 and P3.5-02 attached
+# them; the script refuses any other manifest or report, so a wrong version stops it in minutes.
+notebook_inputs:
+  alyahya737/arc26-p3-4-episodes: 2
+  alyahya737/arc26-p3-4-leakage: 2
+
+# The encoder script in episode mode; it imports only arc26 (the wheel), the image's packages, and
+# the standard library, and starts its encoding processes as copies of itself.
+script: scripts/cache_embeddings.py
+
+# Its config: the 8 views, the two splits, four processes, the check, each value with its reason.
+script_config: configs/cache_embeddings_MT-01.yaml
+
+# The commit for run.json (the dataset copy has no git checkout), and the mount folders of the two
+# P3.4 outputs as the roots the script searches for the build and its check report.
+args:
+  - --commit
+  - "{commit}"
+  - --episodes-root
+  - "{input:alyahya737/arc26-p3-4-episodes}"
+  - --check-root
+  - "{input:alyahya737/arc26-p3-4-leakage}"
+
+# Seconds after the notebook's start: the hard stop. The script starts no chunk after max_wall_s
+# 40,800 s of its own clock (it starts about 150 s in), then finishes the chunks in flight, merges,
+# checks, and writes its logs; 42,300 s leaves about 1,350 s for that. The brief's Timeout is this
+# plus 300 s, 42,600 s, under Kaggle's 12 h.
+script_kill_s: 42300

@@ -1,0 +1,56 @@
+# Submission notebook build for the Kaggle CPU check of P0.5 (task id P0.5-cpu): the same notebook
+# as configs/submission_P0.5-01.yaml, on CPU, with the solver started as a launch probe. It proves
+# on Kaggle, without GPU quota, everything that can fail without a GPU: the image, the mounts, the
+# search for the inputs, the offline install of the wheel, the start of the solver process
+# (python -m arc26.nvarc.starter, its spawned worker, its environment), make_submission, the
+# validator, and run_logs (docs/tasks/P0.5.md, deliverable 7). Read by scripts/build_submission.py
+# and scripts/build_kaggle_notebook.py with yaml.safe_load; runbook docs/runbooks/build_submission.md.
+
+# Its own notebook, <owner>/<slug> (orchestrator default for B3). No pre-run brief may name it:
+# Kaggle may keep a slug's previous accelerator, so the gateway refuses CPU pushes to briefed
+# notebooks.
+kaggle_notebook: alyahya737/arc26-submission-cpu-check
+
+# The same private code dataset as the GPU builds (ADR-010).
+code_dataset: alyahya737/arc26-code
+
+# Same competition as the GPU builds: it mounts the data the notebook searches for.
+competition: arc-prize-2026-arc-agi-2
+
+# No accelerator: a CPU session spends no GPU quota and needs no pre-run brief (BRIEF A9). The
+# notebook then requires no GPU, and MANIFEST.md marks the build unfit to submit.
+accelerator: null
+
+# Same pinned image and model as the GPU builds, so the check runs their environment except for
+# the GPUs (K0 ran this image on CPU).
+reference_metadata: reference/kernel-metadata.json
+
+# Same install notebook version as the GPU builds (see configs/submission_P0.5-01.yaml).
+kernel_source_versions:
+  sorokin/pip-install-unsloth-flash-patch: 2
+
+# Same model folder name as the GPU builds: the check proves the model is found.
+model_slug: qwen3_4b_grids15_sft139
+
+# One DEV4 task with one test input: the probe's worker fails before it reads any task, so one is
+# enough to put a task on the solver's queue.
+subset: ["aa4ec2a5"]
+
+# One worker, so the probe spawns exactly one process (worker 0, which waits for no marker).
+workers: 1
+
+# Same as the GPU builds: the probe's solver runs with PYTHONHASHSEED 0, as they do.
+hash_seed: 0
+
+# The launch probe: the solver starts, its worker imports the moved arc_solver, and unsloth stops
+# it for lack of a GPU. The notebook logs the non-zero exit and still writes a valid submission
+# and run_logs. The traceback from the reference's DEV4 scoring on no candidates is expected.
+run_solver: true
+
+# Seconds after the start, the lowest the builder accepts; the probe never reaches it.
+solver_end_s: 600
+
+# Seconds after the start: the hard stop. The environment check and the install take about a
+# minute (run A's tensorflow uninstall alone took 21 s), so the solver gets about 600 s before
+# it is killed, far more than a failing import needs and short enough for a CPU session.
+solver_kill_s: 660

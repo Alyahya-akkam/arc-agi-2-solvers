@@ -1,0 +1,235 @@
+# P0.1 extraction spec (BRIEF B5 P0.1, ADR-009). scripts/extract_reference.py reads it with
+# yaml.safe_load and writes one module of arc26/nvarc/ per entry of `modules`. Moved code is moved,
+# not rewritten (CLAUDE.md): each module is its cell with exactly the replacements listed here, so
+# this file is the complete list of deviations from the reference notebook. To change moved code,
+# edit this file, rerun the extractor, and keep tests/test_replay.py and the P0.1 parity fixture
+# green; tests/test_extraction.py fails while a module differs from what this file produces.
+# Protected path (CLAUDE.md): a change needs the human's review.
+
+# The notebook the cells come from, relative to the repository root, and its sha256 from
+# reference/README.md. Any other hash refuses the extraction, so a changed notebook is never moved
+# silently. Quoted so YAML never reads the hash as a number.
+notebook: reference/reference_notebook.ipynb
+sha256: "506b85db66f9949022e87935ccb06a73fd78cb690883bd600bfb5c7d36c2b3af"
+# Attribution and license, written into every module header: Apache 2.0 requires both, and a
+# notice on changed files. The full attribution is in reference/README.md.
+origin: the NVARC team's ARC Prize 2025 (ARC-AGI-2) first-place notebook
+kaggle_notebook: sorokin/arc2-qwen3-unsloth-flash-lora-batch4-queue
+license: Apache License 2.0; attribution in reference/README.md
+
+# One entry per module, in notebook order. Keys:
+#   module: file name in arc26/nvarc/; the %%writefile name where the cell has one.
+#   cell: index of the source cell in the notebook.
+#   writefile: the name in the cell's first line `%%writefile <name>`, checked against the cell;
+#     null for a cell the notebook runs inline. The module body is what the magic writes: the cell
+#     after its first line, ending in a newline.
+#   function, top_lines (inline cells only): the first top_lines lines (the imports) stay at module
+#     top; the rest becomes the body of `function`, indented four spaces.
+#   replacements: literal {old, new, count}, applied in one pass. count is the exact number of
+#     occurrences of old in the cell; any other count refuses the extraction. No old may occur
+#     inside another old of the same cell. old is one line; new may span lines.
+# The cfg dict the replacements read has exactly the keys data_dir, model_dir, outputs_dir,
+# marker_dir, subset, workers, timing_dir, lora_r, lora_targets: arc26/runner.py builds it from
+# RunConfig, starter.py parses it.
+#
+# Timing records (task P0.3b, BRIEF B4, docs/modules/timing.md). The replacements marked "Timing"
+# only read clocks and objects that already exist and append records through the logger that
+# starter.py configures in each worker process (arc26/timing.py). They draw no random number and
+# change neither the data the solver sees nor the order of its steps. With a null
+# cfg["timing_dir"] (every competition rerun) no logger exists, so nothing is counted or written.
+modules:
+  # Cell 2: data handling, augmentations, and the Qwen prompt format. transformers is imported only
+  # for an annotation. Moved verbatim.
+  - module: arc_loader.py
+    cell: 2
+    writefile: arc_loader.py
+    replacements: []
+
+  # Cell 3: candidate loading and the two selection scorers. Moved verbatim.
+  - module: arc_decoder.py
+    cell: 3
+    writefile: arc_decoder.py
+    replacements: []
+
+  # Cell 4: the per-GPU worker (test-time training, DFS decoding, augmented rescoring).
+  - module: arc_solver.py
+    cell: 4
+    writefile: arc_solver.py
+    replacements:
+      # arc_loader is a package module now, not a file in the working directory.
+      - old: "from arc_loader import"
+        new: "from arc26.nvarc.arc_loader import"
+        count: 1
+      # The worker receives the run settings that starter.py parsed.
+      - old: "def worker(rank, queue, end_time):"
+        new: "def worker(rank, queue, end_time, cfg):"
+        count: 1
+      # LoRA rank, a run setting (task P1.3, BRIEF B2 Q2): the scope series trains other ranks
+      # with the reference's code. arc26.runner.RunConfig.lora_r defaults to the reference's 256.
+      - old: "r=256,"
+        new: 'r=cfg["lora_r"],'
+        count: 1
+      # LoRA target modules, a run setting (task P1.3): each arm of the scope series trains a
+      # subset of the reference's nine names. RunConfig.lora_targets defaults to all nine in this
+      # order; list() hands Unsloth a list, as the reference did, whatever sequence cfg holds.
+      - old: 'target_modules=["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj", "embed_tokens", "lm_head"],'
+        new: 'target_modules=list(cfg["lora_targets"]),'
+        count: 1
+      # Base model directory: the 2025 mount is gone and the 2026 one differs (K0), so it is a
+      # run setting.
+      - old: 'model_name="/kaggle/input/qwen3_4b_grids15_sft139/transformers/bfloat16/1"'
+        new: 'model_name=cfg["model_dir"]'
+        count: 1
+      # Competition data directory: the 2026 mount differs (K0); the file names stay.
+      - old: '"/kaggle/input/arc-prize-2025/arc-agi_test_challenges.json"'
+        new: 'os.path.join(cfg["data_dir"], "arc-agi_test_challenges.json")'
+        count: 1
+      - old: '"/kaggle/input/arc-prize-2025/arc-agi_evaluation_challenges.json"'
+        new: 'os.path.join(cfg["data_dir"], "arc-agi_evaluation_challenges.json")'
+        count: 1
+      # Candidate folder, a run setting so a CPU replay can use a temporary folder.
+      - old: 'dir_outputs = "/kaggle/inference_outputs"'
+        new: 'dir_outputs = cfg["outputs_dir"]'
+        count: 1
+      # Timing: the logger module, pure Python without GPU code, imported after the reference's
+      # imports so unsloth still comes first.
+      - old: "import pickle"
+        new: "import pickle\n\nfrom arc26 import timing"
+        count: 1
+      # Timing, op `load` (null puzzle_id): the model load, from reading the weights to the
+      # snapshot of the initial adapter that every puzzle resets to. The worker fetches its
+      # logger once here; it is None unless starter.py configured one.
+      - old: "    model, tokenizer = FastLanguageModel.from_pretrained("
+        new: "    timing_logger = timing.get_logger()\n    load_start = time.perf_counter()\n    model, tokenizer = FastLanguageModel.from_pretrained("
+        count: 1
+      - old: "    default_weights = {k: v.clone().detach() for k, v in default_weights.items()}"
+        new: "    default_weights = {k: v.clone().detach() for k, v in default_weights.items()}\n    if timing_logger is not None:\n        timing_logger.record(None, \"load\", time.perf_counter() - load_start)"
+        count: 1
+      # Timing, op `puzzle`: from the reference's start_time to its "finished" print (the record
+      # is the replacement of that print below), on time.perf_counter like every other op, so
+      # the overhead (puzzle minus train, decode, and selection) is never negative. Tokens: null.
+      - old: "        start_time = time.time()"
+        new: "        start_time = time.time()\n        puzzle_start = time.perf_counter()"
+        count: 1
+      # Timing, op `train`: trainer.train(). Tokens: the input ids of the trainer's prepared
+      # training dataset, which the collator receives (one epoch at batch size 1, so every sample
+      # once). They are counted after the train time is taken, from the dataset the trainer
+      # already holds; a dataset without an input_ids column gives null tokens, not an error.
+      - old: "            stats = trainer.train()"
+        new: "            train_start = time.perf_counter()\n            stats = trainer.train()\n            if timing_logger is not None:\n                train_seconds = time.perf_counter() - train_start\n                try:\n                    train_tokens = sum(map(len, trainer.train_dataset[\"input_ids\"]))\n                except Exception:\n                    train_tokens = None\n                timing_logger.record(key, timing.TRAIN, train_seconds, train_tokens)"
+        count: 1
+      # Timing, op `decode`: one inference_turbo_dfs call, one batch of 4 augmented views.
+      # Tokens: the prompt tokens of the batch, the token lists the call receives.
+      - old: "                dfs_result = inference_turbo_dfs(model, tokens, max_new_tokens, max_score, end_time)"
+        new: "                decode_start = time.perf_counter()\n                dfs_result = inference_turbo_dfs(model, tokens, max_new_tokens, max_score, end_time)\n                if timing_logger is not None:\n                    timing_logger.record(key, timing.DECODE, time.perf_counter() - decode_start, sum(map(len, tokens)))"
+        count: 1
+      # Timing, op `selection`: the pair of calc_scores calls that rescore one new candidate grid
+      # under 8 augmented views. Tokens: query plus answer tokens of the 8 views without padding,
+      # tokenized again after the time is taken, since calc_scores keeps its token lists.
+      - old: "                            augmented_scores1 = calc_scores(aug_queries[:4], aug_answers[:4], tokenizer, model)"
+        new: "                            selection_start = time.perf_counter()\n                            augmented_scores1 = calc_scores(aug_queries[:4], aug_answers[:4], tokenizer, model)"
+        count: 1
+      - old: "                            augmented_scores2 = calc_scores(aug_queries[4:], aug_answers[4:], tokenizer, model)"
+        new: "                            augmented_scores2 = calc_scores(aug_queries[4:], aug_answers[4:], tokenizer, model)\n                            if timing_logger is not None:\n                                selection_seconds = time.perf_counter() - selection_start\n                                selection_tokens = sum(len(tokenizer.encode(text)) for text in aug_queries + aug_answers)\n                                timing_logger.record(key, timing.SELECTION, selection_seconds, selection_tokens)"
+        count: 1
+      # Timing, end of op `puzzle`. A puzzle cut by the 1200 s cap or the end time breaks out of
+      # its decode loop and still reaches this print, so it still gets its record.
+      - old: "        print(f\"[Rank {rank}] finished {key} in {spend_time:.1f}s\")"
+        new: "        print(f\"[Rank {rank}] finished {key} in {spend_time:.1f}s\")\n        if timing_logger is not None:\n            timing_logger.record(key, timing.PUZZLE, time.perf_counter() - puzzle_start)"
+        count: 1
+
+  # Cell 5: the launcher: queue of task ids, one spawned worker per GPU.
+  - module: starter.py
+    cell: 5
+    writefile: starter.py
+    replacements:
+      # arc_solver is a package module now.
+      - old: "from arc_solver import worker"
+        new: "from arc26.nvarc.arc_solver import worker"
+        count: 1
+      # Each spawned worker receives the run settings. The call is anchored by its indentation,
+      # because `worker(rank, queue, end_time)` also occurs inside the def line.
+      - old: "def local_worker(rank, queue, end_time):"
+        new: "def local_worker(rank, queue, end_time, cfg):"
+        count: 1
+      - old: "    worker(rank, queue, end_time)"
+        new: "    worker(rank, queue, end_time, cfg)"
+        count: 1
+      # Marker files of the reference's unsloth patching workaround (worker rank waits for
+      # worker rank - 1), in a configurable folder.
+      - old: 'f"/kaggle/worker{rank-1}"'
+        new: 'os.path.join(cfg["marker_dir"], f"worker{rank-1}")'
+        count: 1
+      - old: 'f"/kaggle/worker{rank}"'
+        new: 'os.path.join(cfg["marker_dir"], f"worker{rank}")'
+        count: 1
+      # The run settings arrive as one required JSON argument, parsed right after parse_args().
+      - old: "    args = parser.parse_args()"
+        new: "    parser.add_argument(\"--config\", type=str, required=True)\n    args = parser.parse_args()\n    cfg = json.loads(args.config)"
+        count: 1
+      # Competition data directory, as in cell 4.
+      - old: '"/kaggle/input/arc-prize-2025/arc-agi_test_challenges.json"'
+        new: 'os.path.join(cfg["data_dir"], "arc-agi_test_challenges.json")'
+        count: 1
+      - old: '"/kaggle/input/arc-prize-2025/arc-agi_evaluation_challenges.json"'
+        new: 'os.path.join(cfg["data_dir"], "arc-agi_evaluation_challenges.json")'
+        count: 1
+      # The hard-coded DEV4 filter becomes the subset setting (null: every task, BRIEF B5 P0.1).
+      # It still applies only outside a competition rerun, as in the reference.
+      - old: 'if key not in ["0934a4d8", "36a08778", "981571dc", "aa4ec2a5"]:'
+        new: 'if cfg["subset"] is not None and key not in cfg["subset"]:'
+        count: 1
+      # Worker count, one per GPU: 4 on 4xL4 as in the reference, 1 on 1xL4 for dev runs.
+      - old: "range(4)"
+        new: 'range(cfg["workers"])'
+        count: 1
+      - old: "nprocs=4"
+        new: 'nprocs=cfg["workers"]'
+        count: 1
+      - old: "args=(queue, args.end_time)"
+        new: "args=(queue, args.end_time, cfg)"
+        count: 1
+      # Timing: the logger module, pure Python without GPU code.
+      - old: "import torch.multiprocessing as mp"
+        new: "import torch.multiprocessing as mp\n\nfrom arc26 import timing"
+        count: 1
+      # Timing: each worker process configures its own logger before it starts the worker, which
+      # records to <timing_dir>/timing-rank<rank>.jsonl, so the workers never share a file. A null
+      # cfg["timing_dir"] configures nothing.
+      - old: "    print(f\"[Rank {rank}] start!\")"
+        new: "    if cfg[\"timing_dir\"] is not None:\n        timing.configure(cfg[\"timing_dir\"], f\"rank{rank}\")\n    print(f\"[Rank {rank}] start!\")"
+        count: 1
+
+  # Cell 7: attempt selection, submission.json, and dev-mode scoring. The notebook runs it inline,
+  # so its code becomes a function the P0.5 notebook calls with the three paths.
+  - module: select.py
+    cell: 7
+    writefile: null
+    function: "def write_submission(data_dir, outputs_dir, submission_path):"
+    top_lines: 4
+    replacements:
+      # arc_loader and arc_decoder are package modules now.
+      - old: "from arc_loader import"
+        new: "from arc26.nvarc.arc_loader import"
+        count: 1
+      - old: "from arc_decoder import"
+        new: "from arc26.nvarc.arc_decoder import"
+        count: 1
+      # Competition data directory, a parameter of write_submission.
+      - old: '"/kaggle/input/arc-prize-2025/arc-agi_test_challenges.json"'
+        new: 'os.path.join(data_dir, "arc-agi_test_challenges.json")'
+        count: 1
+      - old: '"/kaggle/input/arc-prize-2025/arc-agi_evaluation_challenges.json"'
+        new: 'os.path.join(data_dir, "arc-agi_evaluation_challenges.json")'
+        count: 1
+      - old: '"/kaggle/input/arc-prize-2025/arc-agi_evaluation_solutions.json"'
+        new: 'os.path.join(data_dir, "arc-agi_evaluation_solutions.json")'
+        count: 1
+      # Candidate folder, a parameter.
+      - old: 'load_decoded_results("/kaggle/inference_outputs")'
+        new: "load_decoded_results(outputs_dir)"
+        count: 1
+      # Both opens of submission.json (the write and the dev-mode reload), a parameter.
+      - old: 'open("submission.json"'
+        new: "open(submission_path"
+        count: 2

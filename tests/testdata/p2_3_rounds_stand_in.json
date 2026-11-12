@@ -1,0 +1,78 @@
+{
+ "about": "Task P2.5: sha256 digests of the split solver's round runs on the GPU stand-ins of tests/test_rounds_solver.py (its RUNS and the k2-off run), recorded at commit 1048c00 (task P2.3's code, before P2.5) by tests/test_in_context_solver.py's normalized(): candidate and round files decoded, records and timing ops without their wall-time fields, DFS prompts hashed. P2.5's defaults must reproduce every one.",
+ "commit": "1048c00",
+ "runs": {
+  "cut": {
+   "candidates": "87190b00523c81e82594893505c292365095527ad859ab072bf5200c11967b03",
+   "dfs": "d7528b86821a40275e2d9502e6ce6558c0edca947866e77b94a2e7b964ac75cc",
+   "events": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "logs": "fbfcfe610d86d6c2ee6d3f72453c61084f5a5930d644c707eda4b58420e7ee1e",
+   "rounds": "6ba2ffc954714d3877ce89eb0b71f297d1bf097a757dcd73f69f0a477ac02d2d",
+   "timing": "9aaf66306da10dbdcb6707b73226b5401beeea9b5314e08de7831883ab8f0f64",
+   "trainings": "b0b105c45dfc04b43b9a500acb051f6b63dd688d9e390eb3a610080258e668b9"
+  },
+  "declined": {
+   "candidates": "87190b00523c81e82594893505c292365095527ad859ab072bf5200c11967b03",
+   "dfs": "631a8dbbbd6b24f22059ee2a008d71a9145aa70cdd71a5dfc815ac840c206ff9",
+   "events": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "logs": "5d0534f6226acbd63610ceed6a4dd701ad3c3e9cec39b032192485c99a26e149",
+   "rounds": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+   "timing": "fbf18c3f4864b399bb88384a944994a5e3e4f56f29ca1f79a704949b7f5c6e2e",
+   "trainings": "b0b105c45dfc04b43b9a500acb051f6b63dd688d9e390eb3a610080258e668b9"
+  },
+  "final": {
+   "candidates": "f1dee8cddd98e7ac57d6d36203bdb7ac832c0a85d49aafe368648524a6c51a21",
+   "dfs": "d9f2b6a4c961d84e71466ad42305d3a2c2a38644b69cc51594d4a9dc0fa66c20",
+   "events": "ce6dee976765df0cc2215713af766170f3610aebf6c127bd7bccd1160e7e20b2",
+   "logs": "24ccf044d15b9916c3d8c32cb9b4c33bd3cf9a86e9d3ee3cfd00fa1e4ae57d9a",
+   "rounds": "2d7dcde0b6a664018e6d3e7e68dd9d32ae801004173e1569e622ef8811a08dc3",
+   "timing": "09d87f3af6e545c3a7ae357cfa75ab5e99b916f34f4cd0dcae3a1a359854a8d5",
+   "trainings": "11994f400a04e45953f06d6919fa2041fa9659aef035a32ae3dd67811501b979"
+  },
+  "k2-off": {
+   "candidates": "b0e3fdd545dc1629585a0c8fe04f97423ad2fbee8c4283d9968b8aeeefb1c227",
+   "dfs": "147265108b33939028408703823a89c5269d97cef9989384b6ce36ea74c47bef",
+   "events": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "logs": "c6435c38efa81e49a3ca77f022a92a80f145e739f0d4d3c63b5beaba52105bef",
+   "rounds": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+   "timing": "06006bf5b7b09b8e80fd8a70a424b743e6394fde9b7180e59dbbdae565c1e17b",
+   "trainings": "f94a5a9f5f6210a59477280f879064207e0fe553aa57a412cf2b85b553f1890a"
+  },
+  "plain": {
+   "candidates": "87190b00523c81e82594893505c292365095527ad859ab072bf5200c11967b03",
+   "dfs": "631a8dbbbd6b24f22059ee2a008d71a9145aa70cdd71a5dfc815ac840c206ff9",
+   "events": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "logs": "ddb0d3f675a4ac7bc3cac9df633674f48e3c193f3cd4fafc6a28b4a3c2619929",
+   "rounds": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+   "timing": "fbf18c3f4864b399bb88384a944994a5e3e4f56f29ca1f79a704949b7f5c6e2e",
+   "trainings": "b0b105c45dfc04b43b9a500acb051f6b63dd688d9e390eb3a610080258e668b9"
+  },
+  "raises": {
+   "candidates": "87190b00523c81e82594893505c292365095527ad859ab072bf5200c11967b03",
+   "dfs": "f88f68f37d6e524e88c0c908d7ca657dbb4b574ee2f1b6639cab46e4f1e15f19",
+   "events": "357b14ad4abb48a39c4c69fa95f91b4cbfdeec409cd8d2a55af35e75ff6a585c",
+   "logs": "372b0c530e70a80432145ebaeba09bb9dbf240b935b2278b70d91f772df445e3",
+   "rounds": "f8c026a7bd0e13a901383f2334e3394e72668e3b2fb01bff57038f5e80ac7a16",
+   "timing": "7133d8b159dcc8a0a53d31b59b00ee8e850559b1ff43bebdb23bdaf547ececce",
+   "trainings": "69190af0fb03fae8dd6956112f009b91636f54dcd1fd0586257e74c196fff0b0"
+  },
+  "rounds": {
+   "candidates": "8d1013b331d67fd6148b8e3017023109d34da136334246a374f47bb893f7093e",
+   "dfs": "c68891cad69c34c01c62bdd350db34371678d0a82b0af73247a2732a53be1162",
+   "events": "ce6dee976765df0cc2215713af766170f3610aebf6c127bd7bccd1160e7e20b2",
+   "logs": "2972abdd6829c14fc9c7ae91ed2404d7014487bd735515b1b7c020f363d98564",
+   "rounds": "b01450604b2f6a523d8fb0756cf8895cce243f7ff3e14cdc9e35ed16f8689fdc",
+   "timing": "de28b78f0f7719a38b4bd3fe4f9da87738def6b0565dc43ca31e41b2939077c2",
+   "trainings": "11994f400a04e45953f06d6919fa2041fa9659aef035a32ae3dd67811501b979"
+  },
+  "two": {
+   "candidates": "f1dee8cddd98e7ac57d6d36203bdb7ac832c0a85d49aafe368648524a6c51a21",
+   "dfs": "5b5ffd5b25562dcce6943a72953bac995607cda48c945763c4188774d699b73e",
+   "events": "ce6dee976765df0cc2215713af766170f3610aebf6c127bd7bccd1160e7e20b2",
+   "logs": "d35c4ba427739a42c0780cf9ae13f61f3970d21a5647b5eccee2917a1c61a20f",
+   "rounds": "fbbc3ffbeba28888c03e7a52e3d9befc94ba8514cf7e7ce8b612110220d37f45",
+   "timing": "72c778e3e49618dcb81f230539b19bac6a91f338cdf212a0298515deb3e15fa3",
+   "trainings": "11994f400a04e45953f06d6919fa2041fa9659aef035a32ae3dd67811501b979"
+  }
+ }
+}

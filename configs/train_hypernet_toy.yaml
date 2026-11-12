@@ -1,0 +1,229 @@
+# Meta-training of the hypernetwork H, toy acceptance run P3.5-01 (task P3.5; BRIEF B2 Q6, B5 P3.5,
+# A8). Read by scripts/train_hypernet.py with yaml.safe_load: every key below is required and no
+# other key is accepted; the smoke section may override any of them. Pre-run brief:
+# docs/prerun/P3.5-01.md. Runbook: docs/runbooks/train_hypernet.md. Paths are the Kaggle mounts
+# (K0, docs/experiments/K0.md); on another machine override them on the command line. "Estimate"
+# below means derived in the brief, section 6, from P1.1-01's measured cost model.
+
+# Run id of the pre-run brief this config serves; run.json and summary.md carry it.
+run_id: P3.5-01
+
+# Folder searched for P3.4's build, found by its MANIFEST.json (task P3.4). On Kaggle the script
+# notebook passes --episodes-root, the mount folder it found for the attached builder output
+# alyahya737/arc26-p3-4-episodes version 2 (configs/script_P3.5-01.yaml pins it); this default
+# searches the whole input mount instead, as on any machine without that argument.
+episodes_root: /kaggle/input
+
+# sha256 of the build's MANIFEST.json bytes: builder v2, alyahya737/arc26-p3-4-episodes version 2,
+# whose leakage check passed (docs/experiments/P3.4.md). Any other manifest is refused.
+manifest_sha256: b1f2cd0413efdbe8d00152dd98e76181556907f22477e3079cc07746ad8b7aa8
+
+# Folder searched for the checker's run_logs/leakage.json naming that manifest; the run refuses a
+# missing report or one whose pass is not true (task brief, deliverable 1). On Kaggle the notebook
+# passes --check-root, the mount of alyahya737/arc26-p3-4-leakage version 2, which checked build 2.
+check_root: /kaggle/input
+
+# P3.4's toy split: 200 training puzzles (100 BARC, 60 ReARC, 40 ARC-AGI-2 training), 10
+# episodes each, 2000 episodes, mean 1278 tokens (P3.4 build 2): B5 P3.5's 200-puzzle toy set.
+train_split: toy
+
+# P3.4's validation split: 286 episodes of 200 puzzles from held-out generator families (141
+# BARC, 145 ReARC; note 4.5), never trained on.
+val_split: val
+
+# The notebook's max_seq_length. P3.4 dropped longer episodes (17 of 99,691), so the run asserts
+# the cap instead of cutting demonstrations as the notebook's cut_to_len would.
+max_tokens: 8192
+
+# The loss covers the query's output-grid tokens and the <|im_end|> that closes them, as the
+# notebook's completion-only training does: H's adapter serves the notebook's decode, where that
+# token ends a grid (and with it fixes the grid's shape). Q6's "output-grid tokens" read so
+# (docs/modules/train.md).
+loss_includes_eos: true
+
+# Cache-key part naming the weights and their precision (the Kaggle model handle, K0).
+model_id: sorokin/qwen3_4b_grids15_sft139/Transformers/bfloat16/1
+
+# Base model folder (config.json, weights, tokenizer): the K0-confirmed mount.
+model_dir: /kaggle/input/models/sorokin/qwen3_4b_grids15_sft139/transformers/bfloat16/1
+
+# One GPU per process. Accelerator NvidiaL4 (4xL4): NvidiaL4X1 is not granted (Kaggle ran it on
+# 2xT4, P0.3-01) and T4 has no bf16.
+device: cuda
+
+# The base's precision: the bf16 Kaggle variant, frozen (B5 P3.5). H and the injected delta stay
+# fp32 (inject's default, PEFT parity).
+dtype: bfloat16
+
+# FlashAttention 2 when flash_attn imports on a bf16 GPU (the install notebook ships 2.8.2, P1.1-01
+# pip freeze), else SDPA; run.json records the one used (B5 P3.5: "flash attention").
+attn_implementation: auto
+
+# Non-reentrant activation checkpointing per decoder layer (B5 P3.5; research note, risks 2 and
+# 3): without it the saved activations of a 6k-token episode exceed an L4's memory.
+gradient_checkpointing: true
+
+# P3.2's encoder, the test-time encoder (ADR-001): the view set must equal the one H sees at test
+# time, and z_bar is computed from un-augmented demonstrations once per distinct pair.
+encoder:
+  # L = 24 of 36 (Q1, ADR-001).
+  layer: 24
+  # Mean over the output-grid tokens (Q1).
+  pool: output
+  # 8 dihedral transforms x 2 color permutations = the decode path's 16 views (P3.2 default).
+  n_perm: 2
+  # The decode path's augment seed (P3.2 default).
+  view_seed: 2
+  # Padded tokens per prefill batch, P3.2's default (cache_embeddings.yaml).
+  batch_tokens: 16384
+  # Pairs per encode call: 256 x 16 views fill several 16k-token batches of small pairs; about
+  # 9 chunks for the toy and validation pairs (about 2,200 pairs, estimate), so 4 GPUs share them.
+  chunk_pairs: 256
+
+# No cache: the toy and validation splits hold about 2,200 distinct demonstration pairs (estimate:
+# 200 toy puzzles of 8 pairs, about 580 validation demonstrations), encoded in about 6 minutes on 4
+# L4s before step 0 (estimate, brief section 6).
+embedding_cache: null
+
+# H, equal to configs/hypernet.yaml (tests/test_train.py checks it): the script ships alone beside
+# the wheel (P0.5d script mode), so the values are copied here. Reasons: configs/hypernet.yaml.
+hypernet:
+  embed_dim: 2560
+  latent: 512
+  head_in: 384
+  dropout: 0.05
+  rank: 16
+  alpha: 32
+  target_modules: [q_proj, k_proj, v_proj, o_proj]
+  seed: 0
+
+# Four processes, one per L4 of NvidiaL4 (task brief: DDP on H, one episode per GPU per step).
+gpus: 4
+
+# accum 1 on 4 GPUs: B5's "2k steps" read as 2000 optimizer steps of 4 episodes each, 8000
+# episode draws, four passes over the 2000 toy episodes (task brief, deliverable 3).
+accum: 1
+
+# B5 P3.5's acceptance horizon: "within 2k steps".
+steps: 2000
+
+# Peak learning rate: D2L's 4e-5 (research note 1.4), the closest scaffold (AdamW, cosine with a
+# minimum lr, warmup, clip 1.0, bf16 base, fp32 hypernetwork). Not tuned here (task brief).
+lr: 4.0e-5
+
+# D2L's minimum lr at the end of the cosine (research note 1.4).
+min_lr: 1.0e-7
+
+# D2L's 100 warmup steps (research note 1.4): 5% of this run.
+warmup_steps: 100
+
+# AdamW decay of 2-D weights, D2L's and T2L's 0.01; none on norms, biases (the head biases hold
+# A_0), and the layer and module codes (research note 1.4; task brief).
+weight_decay: 0.01
+
+# AdamW betas and epsilon, D2L's (research note 1.4) and torch's defaults.
+betas: [0.9, 0.999]
+eps: 1.0e-8
+
+# Gradient-norm clip, D2L's and T2L's 1.0 (research note 1.4, 2).
+clip: 1.0
+
+# No penalty on the emitted factors (task brief: optional, off by default).
+penalty: none
+penalty_weight: 0.0
+
+# Q6's optional KL term: off; only its interface exists (BRIEF A7 cut order, item 4).
+kl_weight: 0.0
+
+# One fixed seed for all comparisons (CLAUDE.md): data order, mismatch control, per-rank RNGs.
+seed: 0
+
+# Validation every 200 steps and at step 0: 11 points on the curve, about 80 s each on 4 L4s
+# (two references of about 40 s, estimate), about 12% of the run.
+eval_every: 200
+
+# Checkpoints every 200 steps (about 11 minutes of training, estimate): a lost session costs at
+# most that. Each is about 1.6 GB (H and AdamW in fp32).
+ckpt_every: 200
+
+# Two checkpoints on /kaggle/working (about 3.2 GB of its 20 GB): the latest and one before it,
+# in case the latest is cut short.
+keep_checkpoints: 2
+
+# Checkpoints stay on Kaggle (outside the pull allowlist); a later notebook attaches this output.
+ckpt_dir: /kaggle/working/checkpoints
+
+# Run logs: kaggle_ops.py pull brings /kaggle/working/run_logs back to runs/P3.5-01/.
+out_dir: /kaggle/working/run_logs
+
+# Session budget, seconds from the script's start: checkpoint and exit 3 before the next step
+# could cross it. 15000 s sits above the projected-wall kill (so a run projected too long is
+# killed first) and below the notebook's hard stop of 15600 s (brief: Timeout 15900).
+max_wall_s: 15000
+
+# Kill criteria the script enforces itself (exit 4, after a checkpoint and the summary).
+kill:
+  # 60 s per optimizer step: about 7 times the worst-case step (4 episodes of 6,252 tokens, about
+  # 9 s, estimate). Catches a run on the wrong device or paging, not a long episode.
+  max_step_s: 60
+  # 4 hours of projected wall time for the whole run: about 1.8 times the 2.2 h estimate, whose
+  # largest unknown is plain transformers' speed against Unsloth's (brief, section 6).
+  max_projected_s: 14400
+  # The projection waits for 50 steps: the mean of 50 step times is within about 10% (estimate:
+  # step times vary by about 50%).
+  projection_after_steps: 50
+
+# --smoke: the same code on the CPU with the tiny random Qwen3 (hidden 64, 4 layers), the stand-in
+# tokenizer, and the fixture episodes, in 2 processes on gloo (BRIEF A8; task brief). These keys
+# replace the ones above; relative paths are from the repository root.
+smoke:
+  # Keeps smoke outputs apart from the GPU run's.
+  run_id: P3.5-smoke
+  # The fixture build: 12 toy and 6 validation episodes of small grids (tests/test_train.py).
+  episodes_root: tests/testdata/train_hypernet/episode_build
+  # sha256 of the fixture's MANIFEST.json; tests/test_train.py rebuilds the fixture and checks it.
+  manifest_sha256: 15317ba48d7efefab0b37aaa69727454cb3fd71141140a1cd1d018c4013b0550
+  # The fixture's passing check report (synthetic: no evaluation data is involved).
+  check_root: tests/testdata/train_hypernet/check
+  # The random stand-in weights get their own cache namespace.
+  model_id: smoke/tiny-random-qwen3
+  # null selects the tiny random Qwen3 and the stand-in tokenizer, built in code.
+  model_dir: null
+  # BRIEF A0: no local GPU work.
+  device: cpu
+  # fp32: CPU bf16 matmuls are slow, and the smoke checks logic, not precision.
+  dtype: float32
+  # SDPA on the CPU (task brief).
+  attn_implementation: sdpa
+  # Layer 2 of the tiny model's 4, mid-stack as 24 of 36 is; small batches and chunks, so the
+  # sharded encode runs several rounds.
+  encoder:
+    layer: 2
+    batch_tokens: 4096
+    chunk_pairs: 4
+  # H's widths shrunk to the tiny base (hidden 64); scope and seed as above.
+  hypernet:
+    embed_dim: 64
+    latent: 32
+    head_in: 16
+  # Two processes on gloo (task brief), so the smoke runs DDP.
+  gpus: 2
+  # 24 steps of 2 episodes: four passes over the 12 fixture episodes, as the toy run makes.
+  steps: 24
+  # A high lr so the memorizable fixture's training loss falls within the few steps.
+  lr: 3.0e-3
+  min_lr: 1.0e-4
+  warmup_steps: 2
+  # Validation at steps 0, 8, 16, 24 and checkpoints at 8, 16, 24: the resume test starts from 8.
+  eval_every: 8
+  ckpt_every: 8
+  keep_checkpoints: 3
+  # Smoke outputs under runs/, which git ignores.
+  ckpt_dir: runs/P3.5-smoke/checkpoints
+  out_dir: runs/P3.5-smoke/run_logs
+  # Generous for a CPU run of seconds.
+  max_wall_s: 600
+  kill:
+    max_step_s: 60
+    max_projected_s: 600
+    projection_after_steps: 4

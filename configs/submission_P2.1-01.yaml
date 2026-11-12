@@ -1,0 +1,93 @@
+# Submission notebook build for run P2.1-01: the price of the held-out gate on DEV40 (BRIEF B5
+# P2.1, B8 "Gate cost and gate price", ADR-013). One series arm, the notebook configuration with
+# one demonstration pair per puzzle held out: the split solver trains and decodes without it, and
+# after each puzzle's test decode the held-out gate decodes the held-out input and logs whether
+# its voted answer is exact. Its hold-out-off arm is P1.3-01's arm 1 (8.5 of 40, same settings,
+# nvarc solver). Read by scripts/build_submission.py and scripts/build_kaggle_notebook.py with
+# yaml.safe_load; runbook docs/runbooks/build_submission.md (series mode, hold-out arms); pre-run
+# brief docs/prerun/P2.1-01.md. A development build, never to be submitted: its MANIFEST.md says
+# "not for submission" (its notebook is not alyahya737/arc26-submission, and it is a series),
+# and a competition rerun would ignore the arm and run the reference settings once.
+
+# A development notebook of its own, <owner>/<slug>, owner KAGGLE_OWNER of scripts/kaggle_ops.py;
+# a slug belongs to one task branch (docs/prerun/README.md), and alyahya737/arc26-submission
+# keeps only builds meant for submission.
+kaggle_notebook: alyahya737/arc26-holdout-gate
+
+# The same private code dataset as every build (ADR-010). The wheel differs from P2.0-01's (it
+# adds arc26/loop.py and RunConfig.holdout), so it needs a new version made from this build.
+code_dataset: alyahya737/arc26-code
+
+# Competition attached: it mounts the data, and only notebooks attached to it get L4s (research
+# note, section 2).
+competition: arc-prize-2026-arc-agi-2
+
+# 4xL4, the hardware of the hold-out-off arm (P1.3-01) and of the scored rerun: the comparison
+# needs the same hardware, and the gate's per-batch seconds must transfer to the governor's cost
+# model (P2.4). There is no other accelerator to fall back on: NvidiaL4X1 is not granted (Kaggle
+# ran P0.3-01's NvidiaL4X1 push on its default 2xT4, 1 Oct), and T4 has no bf16, which the solver
+# needs. The pre-run brief sets the 30-minute queue limit; the fallback is waiting.
+accelerator: NvidiaL4
+
+# Same pinned image and install notebook source as every build (ADR-010).
+reference_metadata: reference/kernel-metadata.json
+
+# Same install notebook version as every build (see configs/submission_P0.5-01.yaml).
+kernel_source_versions:
+  sorokin/pip-install-unsloth-flash-patch: 2
+
+# Same model folder name as every build (K0).
+model_slug: qwen3_4b_grids15_sft139
+
+# DEV40 (arc26.data.DEV40, frozen): 40 tasks, 55 test outputs, stratified by the largest grid
+# side; one task is 2.5 points. P1.3-01's arm 1, the hold-out-off arm, solved these 40. Quoted so
+# YAML never reads an id as a number.
+subset: [
+  "136b0064", "16de56c4", "195c6913", "20a9e565", "28a6681f", "2ba387bc", "31f7f899",
+  "332f06d7", "3e6067c3", "446ef5d2", "45a5af55", "4a21e3da", "581f7754", "5961cc34",
+  "64efde09", "7b0280bc", "7b5033c1", "7c66cb00", "80a900e0", "8698868d", "89565ca0",
+  "8f3a5a89", "9385bd28", "a25697e4", "b0039139", "b10624e5", "b5ca7ac4", "c7f57c3e",
+  "cbebaa4b", "db0c5428", "db695cfb", "dbff022c", "dd6b8c4b", "de809cff", "dfadab01",
+  "e12f9a14", "e3721c99", "e376de54", "eee78d87", "f560132c",
+]
+
+# One worker per L4, as P1.3-01 and the scored rerun.
+workers: 4
+
+# Same PYTHONHASHSEED as P1.3-01 and every run since run A: one fixed seed for all comparisons
+# (CLAUDE.md), so the arm draws the hold-out-off arm's rescoring augmentations.
+hash_seed: 0
+
+# The run solves DEV40 once, with the hold-out arm.
+run_solver: true
+
+# Seconds after the notebook's start: the workers' soft deadline. The arm is estimated at about
+# 9,700 s of solver wall, and 12,100 s if decode and the gate run 30% slower than P1.3-01's arm
+# 1 (docs/prerun/P2.1-01.md, section 6), so 14,400 s (4 h) never binds on a healthy run and
+# bounds the quota of an unhealthy one.
+solver_end_s: 14400
+
+# Seconds after the start: the hard stop, 900 s after the soft deadline, as P2.0-01: a worker
+# that took a puzzle just before the soft deadline still trains (fit ignores the deadline; the
+# longest DEV40 fit in P1.3-01's arm 1 took 454 s), while its decode and gate stop at once. The
+# brief's Timeout is this plus 900 s (16,200 s), for the selection and the logs.
+solver_kill_s: 15300
+
+# The solver's code (task P2.0, ADR-011): hold-out needs the split solver, which trains and
+# decodes in separate calls (arc26.ttt.fit, arc26.decode.decode_puzzle); the moved reference does
+# both in one loop body. P2.0-01 checks the split against the reference on GPU first.
+solver: split
+
+# The series, one arm: P2.1's hold-out-on arm. Its off arm is P1.3-01's arm 1, so it is not run
+# again (about 3.8 quota h saved).
+arms:
+  # The notebook configuration, as P1.3-01's arm 1 (the builder requires it first; submission.json
+  # comes from it), with the held-out gate.
+  - name: r256-proj-emb-holdout
+    lora_r: 256
+    lora_targets: [q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj,
+                   embed_tokens, lm_head]
+    # B5 P2.1's rule, the last real pair by index; held out at k = 2 too (B5: a flag, default on,
+    # ablated in P2.7); and out of the test inputs' prompts, the loop's choice (ADR-013).
+    holdout: {rule: last, k2: true, in_test_prompts: false}
+    reason: "The notebook configuration with the last real pair held out and the gate run; the off arm is P1.3-01's arm 1"

@@ -1,0 +1,343 @@
+# The long shot's run config for run P4.7-02 (task P4.7b, docs/tasks/P4.7b.md): version 8's shot
+# (configs/agent_shot_P6.9e.yaml, arc26-submission version 8, Code-commit 6edf545, run P6.9-05)
+# with one change, selection.zero_bucket false: the queue takes only tasks in (0, 0.5), and the
+# tasks at NVARC's confidence 0 go to the notebook's rank-256 tail after the shot stage
+# (scripts/build_kaggle_notebook.py, agent.tail). The shot at confidence 0 yields 0.066 tasks
+# each at 447 s of the 4-GPU machine (0.53 tasks per wall hour) against rank 256's 2.4 there
+# (docs/research/second_pass_screen.md on task/ideas e79a1a0), and version 8 reaches about 1 of
+# its 38 confidence-0 tasks at 240 tasks (docs/research/shot_tail_screen.md, 6e54ba4). Read by
+# arc26/agent/shot.py (config_from_mapping). tests/test_p4_7b.py checks that this file equals
+# configs/agent_shot_P6.9e.yaml in every key but selection.zero_bucket. Every value not
+# commented otherwise keeps its reason in configs/agent_shot_P6.9e.yaml,
+# configs/agent_shot_P6.9.yaml, and configs/agent_shot.yaml; the pre-run brief is
+# docs/prerun/P4.7-02.md.
+
+# The project's one fixed seed (CLAUDE.md): each attempt's sampling seed is
+# arc26.agent.loop.attempt_seed of it and the attempt id "<task>/p0/0", as in P6.3-05.
+seed: 0
+
+# The session's end and the margins around generation (arc26.agent.run's rules, which the
+# notebook's --deadline and the builder's checks read: scripts/build_kaggle_notebook.py,
+# AGENT_CONFIG_DEADLINE_KEYS).
+deadline:
+  # Kaggle's limit for a code competition notebook: 12 hours.
+  session_s: 43200
+  # Development mode's default only (no --deadline, --session-start, or --budget-s): the time
+  # assumed gone before this process starts, NVARC's stage included in a hybrid: arc26.agent.run's
+  # value. The notebook always passes --deadline, so a scored run never uses it.
+  startup_margin_s: 1800
+  # Seconds kept after generation stops (every call still running is cancelled then, design
+  # point 6) and before the end the notebook passes: the engine's stop (stop_timeout_s 60 below,
+  # then SIGKILL and arc26.agent.server's 30 s wait for the group) and the final write (well under
+  # a second): 90 s, plus 30 s of slack.
+  final_margin_s: 120
+  # Seconds calls may run past the generation stop: none. The shot cancels every call still
+  # running at the stop (design point 6) and its task keeps NVARC's attempts; the key exists for
+  # the builder, which reads it from every agent config.
+  grace_s: 0
+
+# Which tasks the shot takes (design point 3).
+selection:
+  # Never a task whose confidence is at or above this: 0.5, the brief's default. On DEV40 in
+  # P2.6-01 it keeps exactly P6.3-05's 15 (the 15th, dd6b8c4b, at 0.465; the 16th, 4a21e3da, at
+  # 0.511: configs/P6.3-05.yaml, direct.task_ids). The orchestrator may change it after the
+  # P6.3-05 record's merge table.
+  max_confidence: 0.5
+  # Optional key (option 2a): (0, 0.5) first, then confidence 0, instead of least sure first. The
+  # 27B solved 2.5 of 7 shot tasks in (0, 0.5) and 3.5 of 53 at exactly 0 (P6.3-05, P6.3-06,
+  # P6.5-03), and NVARC's attempt 2 was never right in (0, 0.5) on DEV120 (P2.6-01, P1.1-01:
+  # reports/P2.8), so the merge loses nothing there. Submission 3's queue reached none of DEV240's
+  # 17 tasks in that bucket. Run P6.9-01 added 0.5 of 4 there: pooled 3.0 of 11, posterior g1 0.19
+  # (90%: 0.08 to 0.33) against 0.066 at confidence 0 (docs/experiments/P6.9-01.md).
+  order: buckets
+  # Optional key: [0.5, 0.7) after (0, 0.5) and before confidence 0 (option 2c's order), only if
+  # run P6.9-01's merged net there is at least 1 of 6 (docs/prerun/P6.9-01.md, section 1). Off: its
+  # row 4' read Keep, a net of 1.0 less P2.8's attempt-2 loss 6 x 5.5/46 = 0.717 gives 0.283, under
+  # 1 (docs/experiments/P6.9-01.md, Reading 4). It would need max_confidence 0.7.
+  mid_bucket: false
+  # Optional key (task P4.7b): no task at NVARC's confidence exactly 0 in the queue. Those go to
+  # the notebook's rank-256 tail, which runs in the time the shot leaves (about 3,000 s of idle
+  # machine after version 8's last start at 240 tasks: shot_tail_screen.md) at 2.4 tasks per wall
+  # hour against the shot's 0.53 there; the (0, 0.5) bucket, where the shot yields 0.19 per task,
+  # keeps every start.
+  zero_bucket: false
+
+# The waves and their time and memory arithmetic (design point 4; docs/runbooks/agent_shot.md,
+# "What it does"). A wave of n tasks with thinking cap C and longest opening o is planned to take
+# C / (plan_factor * rate_tokens_per_s) + n (o + C) / prefill_tokens_per_s
+# + forcing_tokens / rate_tokens_per_s + margin_s: the turn, then the forced replies with every
+# turn of the wave assumed cut (the coordinator's decision, 14 Oct).
+waves:
+  # Tasks per wave: P6.3-05's 15 streams, the count its rate was measured at; more streams would
+  # lower the rate per stream below the measured one.
+  wave_tasks: 15
+  # The largest thinking cap C: 69,632 (17 x 4,096; run P6.9-05's one change from P6.9's 94,208,
+  # the cap P6.9-04 ran on GPU). Of the 7 solves in P6.5-03's and P6.9-01's 30 long attempts, 6
+  # ended their thinking under 70k tokens (24,137 to 68,021) and the one above was forced at the
+  # 94,208 cap (docs/tasks/P6.9d.md), so a turn that would run to 94,208 ends 26% sooner
+  # (1 - 69,632 / 94,208 = 0.261), one between the caps by less, and its stream refills sooner.
+  # Without MTP the pool is the base's (P6.9-03's boot.json: 1,699,566 tokens), so 15 streams fit
+  # with room: 15 (6,771 + C + 6,144) = 1,238,205. min_cap stays 65,536, under this cap
+  # (config_from_mapping requires min_cap <= max_cap), so the latest start and the notebook's
+  # min_stage_s are P6.9's.
+  max_cap: 69632
+  # Below this cap no task starts: 65,536 (option 2b (i)). Short caps never solved: P6.5-03's wave
+  # at 26,469 solved 0 of 15, P6.3-04's arm D at 28,805 tokens per task 0 of 29 NVARC misses, and
+  # a third party's 32k budgets 1.0 of 36 against 3.5 to 6.0 at 64k (beyond_h_options.md, 1.6).
+  # Run P6.9-01 agrees: its 5 shot solves ended their turns at 24,137 to 68,021 tokens, none under
+  # 24k, and 4 of its 15 turns ran to the 94,208 budget (docs/experiments/P6.9-01.md).
+  min_cap: 65536
+  # Share of the measured rate the plan assumes for the thinking turn: 0.85, the brief's value
+  # (P6.3-05's 15 streams ran at 16.5 to 17.6 tokens per second each at 50k to 70k contexts in
+  # server_metrics.jsonl, 0.87 to 0.93 of the average below).
+  plan_factor: 0.85
+  # Tokens per second per stream while thinking, the opening's prefill included: 94,208 tokens
+  # in 4,966.5 to 4,968.2 s for each of the 8 turns cut at the cap, 15 streams at contexts up to
+  # 100k (P6.3-05, engine_calls.jsonl: 18.96 to 18.97; the brief's table: 19.0). Also the forced
+  # reply's generation rate.
+  rate_tokens_per_s: 19.0
+  # Prompt tokens per second of the forced replies, prefilled together: P6.3-05's 8 forced
+  # replies held 783,425 prompt tokens (95,749 to 100,238 each) and ran from their common start
+  # to the last end in 817.1 s (engine_calls.jsonl: ended minus seconds, 8 starts within 1.7 s):
+  # 958.8. Their generation (520 to 3,820 tokens) is inside that wall time, so the rate is low.
+  prefill_tokens_per_s: 958.8
+  # The longest opening o for the fixed arithmetic (stage_arithmetic, the notebook's min_stage_s):
+  # P6.3-05's longest opening bound, e3721c99's 5,780 user and 895 system characters plus the
+  # loop's 96 tokens of slack (5,954 /tokenize tokens). A wave's own plan uses its tasks' bounds.
+  opening_tokens: 6771
+  # Seconds added to every planned wave (the brief's 300, kept by the coordinator): the writes and
+  # the next wave's start (under a second each) and run-to-run spread; with the rest of the plan
+  # it lets a time-bound wave of 15 at the full cap end down to 15.5 tokens per second per stream
+  # (18% under 19.0; stage_arithmetic's least_rate_full).
+  margin_s: 300
+  # The KV pool in tokens when the boot reports none (the fake engine; a log without the line):
+  # P6.3-05's boot at max_model_len 131,072 (boot.json, kv_cache_tokens_first 1,699,566). A real
+  # boot's own number always wins (the engine log, else /metrics).
+  kv_pool_tokens: 1699566
+  # Seconds from this process's start to the first wave, used only to skip the boot when even the
+  # smallest wave could not follow: P6.3-05's engine preparation 40.3 s, GPU preflight 3.4 s, boot
+  # 300.1 s, and sanity request 1.7 s (run.json stages), 345.5 s, plus 30%: 450.
+  setup_s: 450
+  # Optional key (option 2b (ii)): a refill queue. A stream whose task ends starts the next
+  # queued task at once with the cap the time left allows (arc26.agent.shot.plan_start), instead
+  # of waiting for the slowest of its wave: 4 of 15 turns ended early in P6.5-03's first wave and
+  # 7 of 15 in P6.3-05, each leaving its stream idle until the wave ended; in run P6.9-01 11 of 15
+  # ended on their own at 24,137 to 91,426 tokens (docs/experiments/P6.9-01.md, Result).
+  refill: true
+
+# Each task's request: P6.3-05's direct phase (scripts/agent_spike.py, direct_phase; the
+# arc26.agent.loop.Budget it built), the thinking cap aside, which the wave sets.
+request:
+  # The two-answer direct prompt (arc26.agent.prompts.DIRECT_TWO_SYSTEM_PROMPT): up to two answer
+  # blocks per test input, best first, the competition's two attempts (P6.3-05,
+  # direct.answers_per_test 2).
+  system_prompt: direct_two
+  # xhigh: the organizers' 42.4% point (P6.3-05, direct.reasoning_effort).
+  reasoning_effort: xhigh
+  # Qwen3.8's thinking temperature (generation_config.json: 1.0); the loop's default, which
+  # P6.3-05 used.
+  temperature: 1.0
+  # One thinking turn, then its answer-forcing turn if it is cut (P6.3-05: Budget.max_turns 1).
+  max_turns: 1
+  # The answer-forcing reply's cap: two answers for each of two 30 x 30 outputs (P6.3-05,
+  # direct.forcing_tokens).
+  forcing_tokens: 6144
+  # The forcing note asking for one or two answers per test input (P6.3-05: answer2).
+  forcing_kind: answer2
+  # The cut reasoning stays in the forcing turn's context (P6.3-05: preserve_thinking true).
+  preserve_thinking: true
+  # The context per request: server.max_model_len (P6.3-05, direct.context_tokens).
+  context_tokens: 131072
+  # No reply is requested with less room than this: the loop's default, which P6.3-05 used.
+  min_turn_tokens: 256
+  # Unused (no REPL runs a block): P6.3-05's direct phase passed 1.0.
+  cell_timeout_s: 1.0
+  # Code blocks per reply: the loop's default, which P6.3-05 used (no block runs).
+  max_cells: 4
+  # Characters of one feedback message: the loop's default, which P6.3-05 used.
+  feedback_chars: 6000
+  # Optional key (option 2b (iii)): the answer forced inside the thinking request through vLLM's
+  # thinking_token_budget. Off, Submission 3's separate forcing turn: run P6.9-01's row 5' read
+  # Revert, 6 of the 7 outputs of its 4 budget-ended turns answered (rho 0.857) against the 13/15 =
+  # 0.867 the separate turn reached (docs/experiments/P6.9-01.md, Reading 5). The plan keeps the
+  # forced replies' prefill term; the record's Monte Carlo puts the revert's cost at about 0.1
+  # attempts. Without it the request sends no budget, so the end note (thinking_end_note) is
+  # absent and the server runs with Submission 3's flags (server.extra_args).
+  forcing_in_request: false
+  # Optional key (option 4b): a block the strict parser refuses is read again with the lenient
+  # rules (digit-string rows, one-digit string cells, digit-string rows whose brackets do not
+  # balance), and a test output's S1 is its first answer of the shape the demonstrations imply
+  # (the model's best-first order, drafts of other sizes skipped). On
+  # every earlier shot transcript the lenient rules read all 91 valid blocks as before and
+  # recovered 9 of 24 refused ones (6 of P6.3-06's 9, both of P6.5-02's, 1 of P6.5-03's 11). On:
+  # in run P6.9-01 it read no answer the strict parser refused (6.0 of 15 either way) and changed
+  # no valid one (docs/experiments/P6.9-01.md, Reading), so it costs nothing and recovers the forms
+  # earlier runs wrote.
+  lenient_answers: true
+
+# One request after the boot that must come back sane before any wave (design point 7), as
+# P6.3-05's sanity check (scripts/agent_spike.py, sanity_check: 1.69 s, 37 tokens).
+sanity:
+  # Generated-token cap: a short low-effort answer fits well under it (P6.3-05: 2,048).
+  max_tokens: 2048
+  # Low effort: brief thinking, to keep it short (P6.3-05).
+  reasoning_effort: low
+  # Seconds before the request counts as failed: P6.3-05's streaming timeout (600).
+  timeout_s: 600
+
+# Degenerate replies: the symptom of NaN logits or a broken kernel (P6.3-05's degenerate section).
+degenerate:
+  # A run of this many identical consecutive tokens marks a reply degenerate.
+  max_run: 64
+  # Token ids at or above this are special (generation_config.json: <|endoftext|> 248044,
+  # <|im_end|> 248046) and break runs.
+  special_min_id: 248044
+  # End-of-sequence ids: runs count only before the first.
+  eos_ids: [248046, 248044]
+  # More than this share of a wave's tasks with a degenerate reply ends the shot after that wave
+  # (P6.3-05's kill.degenerate_share 0.5); a degenerate reply's task always keeps NVARC's
+  # attempts.
+  wave_share: 0.5
+
+# The engine client (arc26.agent.engine.EngineConfig), as P6.3-05's make_engine built it: these
+# values equal its defaults, which a test checks.
+engine:
+  # Seconds to open a connection to the local server.
+  connect_timeout_s: 10.0
+  # Retries after a connection failure, with backoff: about 30 s in all.
+  max_retries: 5
+  # The first retry's delay in seconds; it doubles per retry.
+  backoff_s: 1.0
+  # The cap on one retry's delay in seconds.
+  backoff_max_s: 30.0
+  # Ask vLLM for each reply's token ids (return_token_ids), which the degenerate check reads; a
+  # top-level field of every request, as in P6.3-05.
+  return_token_ids: true
+  # Count each opening prompt with vLLM's /tokenize (P6.2's count_prompt_tokens, logged to
+  # prompt_counts.jsonl), as P6.3-05 did; a failed count falls back to the loop's character bound.
+  count_prompts: true
+
+# The steps between the wheelhouse install (the notebook's) and the boot, as P6.3-05 ran them
+# (arc26.agent.engine_prep, moved from scripts/agent_spike.py). With --engine-venv only.
+engine_prep:
+  # Run them: without the orphan FlashInfer provider's removal every worker dies at the boot
+  # (P6.3-01, attempt 2).
+  enabled: true
+  # Modules the engine's workers import, imported once with the venv's python and the engine's
+  # environment (P6.3-05: configs/P6.3-05.yaml, wheels.engine_imports, all 16 in 40.3 s).
+  imports:
+    - vllm.v1.worker.gpu_worker
+    - vllm.distributed.device_communicators.cuda_communicator
+    - vllm.distributed.device_communicators.custom_all_reduce
+    - vllm.distributed.device_communicators.flashinfer_all_reduce
+    - vllm.distributed.device_communicators.flashinfer_pcie_ipc_all_reduce
+    - vllm.distributed.device_communicators.pynccl
+    - vllm.distributed.device_communicators.quick_all_reduce
+    - vllm.distributed.device_communicators.symm_mem
+    - vllm.v1.worker.gpu_model_runner
+    - vllm.model_executor.models.qwen3_5
+    - vllm.model_executor.layers.mamba.gdn.qwen_gdn_linear_attn
+    - vllm.v1.attention.backends.triton_attn
+    - vllm.v1.attention.backends.gdn_attn
+    - vllm.model_executor.layers.quantization.compressed_tensors.compressed_tensors
+    - vllm.v1.sample.sampler
+    - vllm.model_executor.warmup.kernel_warmup
+  # Seconds for that import check: about 8 times P6.3-05's 37 s (configs/P6.3-05.yaml).
+  check_timeout_s: 300
+  # Check from the venv that torch sees tensor_parallel_size working GPUs before the boot
+  # (P6.3-05's preflight, 3.4 s): a missing GPU fails in seconds instead of at the boot.
+  preflight: true
+  # Scratch for the empty sitecustomize (its engine_site folder, first on the engine's
+  # PYTHONPATH): never the notebook's output; the notebook's agent scratch (AGENT_DEFAULT_SCRATCH).
+  scratch_dir: /tmp/arc26-agent
+
+# vLLM's server: `vllm serve <model dir>` from the engine venv, arc26.agent.server's
+# ServerConfig. The flags equal P6.3-05's boot (its metrics.json server_command, paths aside),
+# which a test checks; configs/P6.3-05.yaml gives each one's reason at length.
+server:
+  # Local only: the client runs in the same session.
+  host: 127.0.0.1
+  # vLLM's default port.
+  port: 8000
+  # The name requests use (P6.3-05's).
+  served_model_name: qwen38-27b-int4
+  # All four L4s in one replica: the 4 KV heads allow 1, 2, or 4, and one TP4 replica does not
+  # duplicate the weights (models note, section 5.2).
+  tensor_parallel_size: 4
+  # FP8 KV cache: half the memory of BF16 KV, about twice the sequences.
+  kv_cache_dtype: fp8
+  # Prefix caching on (P6.3-05); the NaN bug #55766 needs speculation, which is off.
+  enable_prefix_caching: true
+  # Context per request: P6.9's 131,072, unchanged so the pool and the boot stay P6.9-03's; the
+  # longest request, an opening (at most 5,954 tokens in P6.3-05) plus the 69,632-token turn plus
+  # the forcing reserve (8,046), fits with room, inside Qwen3.8's native 262,144.
+  max_model_len: 131072
+  # Concurrent sequences: P6.3-05's 64, above the 15 of a wave.
+  max_num_seqs: 64
+  # Prompt tokens per scheduler step (chunked prefill), P6.3-05's.
+  max_num_batched_tokens: 8192
+  # Share of each L4's memory vLLM may use: about 2.3 GB per GPU left for the CUDA context and
+  # NCCL (P6.3-05's 0.90).
+  gpu_memory_utilization: 0.90
+  # Triton attention: takes an FP8 KV cache on sm_89 without a FlashInfer JIT (models note, 4.1).
+  attention_backend: TRITON_ATTN
+  # Text only: the vision tower is never loaded.
+  language_model_only: true
+  # Splits the thinking from the answer (the model card's serving command).
+  reasoning_parser: qwen3
+  # Default sampling from the checkpoint's generation_config.json (temperature 1.0, top_p 0.95,
+  # top_k 20).
+  generation_config: auto
+  # No other flag, as P6.3-05 and Submission 3 (P6.5-03): no speculative decoding (#55533,
+  # #55766), and no --reasoning-config, which only the in-request forcing (off, run P6.9-01's row
+  # 5') would use.
+  extra_args: []
+  # Engine environment, added to the image's with PYTHONPATH and PIP_* removed: P6.3-05's
+  # variables, the caches under the notebook's agent scratch instead of the spike's.
+  env:
+    # The PyTorch top-k and top-p sampler: no FlashInfer JIT (no CUDA 13 nvcc in the image).
+    VLLM_USE_FLASHINFER_SAMPLER: "0"
+    # vLLM's own startup limit, above its 600 s default; boot_timeout_s below ends the wait first.
+    VLLM_ENGINE_READY_TIMEOUT_S: "1800"
+    # Caches on scratch, never in the notebook's output.
+    VLLM_CACHE_ROOT: /tmp/arc26-agent/vllm-cache
+    # Hugging Face caches on scratch.
+    HF_HOME: /tmp/arc26-agent/hf-home
+    # The session has no internet: no Hub lookups.
+    HF_HUB_OFFLINE: "1"
+    # Same, for transformers.
+    TRANSFORMERS_OFFLINE: "1"
+    # No usage reporting attempts in an offline session.
+    VLLM_NO_USAGE_STATS: "1"
+    # Same, for the libraries that read it.
+    DO_NOT_TRACK: "1"
+    # NCCL's transport report in the engine log, as in P6.3-05 (8 SHM lines in its boot.json).
+    NCCL_DEBUG: INFO
+    # Triton's compile cache on scratch.
+    TRITON_CACHE_DIR: /tmp/arc26-agent/triton-cache
+    # Inductor's compile cache on scratch.
+    TORCHINDUCTOR_CACHE_DIR: /tmp/arc26-agent/inductor-cache
+  # Removed from the engine's environment: an image ptxas for CUDA 12 would assemble Triton 3.7's
+  # newer PTX; Triton uses its bundled tools without these (P6.3-05).
+  unset_env: [TRITON_PTXAS_PATH, TRITON_CUOBJDUMP_PATH, TRITON_NVDISASM_PATH]
+  # Seconds until /health must answer: about 3 times P6.3-05's 300.1 s (its 900).
+  boot_timeout_s: 900
+  # Seconds between SIGTERM and SIGKILL of the engine's process group.
+  stop_timeout_s: 60
+  # Seconds between health probes during the boot.
+  health_interval_s: 2.0
+  # Seconds between the supervisor's checks during the waves (process alive, /health).
+  monitor_interval_s: 5.0
+  # Seconds without a healthy answer, the process alive, before the engine counts as gone: far
+  # above any /health delay of a loaded server, short against a wave of about 6,000 s.
+  hang_s: 600
+  # No restart: an engine that fails to boot or dies ends the shot with NVARC's file in place
+  # (design point 7). A second boot costs about 300 s, a twentieth of the window at u = 0.74, and
+  # a death would cut every call of the wave anyway.
+  restarts: 0
+
+logs:
+  # Every conversation, replies with their reasoning, to shot_transcripts.jsonl in development
+  # mode (the record's reading needs them, as P6.3-05's direct_transcripts.jsonl); competition
+  # mode never writes them.
+  dev_transcripts: true

@@ -1,0 +1,26 @@
+# Competition data, weights, human-run outputs, build outputs (BRIEF A6).
+# runs/ holds downloaded Kaggle outputs locally; only summaries under docs/experiments/ are committed.
+data/
+checkpoints/
+runs/
+dist/
+*.safetensors
+*.bin
+*.pt
+*.ckpt
+kaggle.json
+access_token
+.kaggle/
+.env
+.ipynb_checkpoints/
+
+# The reference notebook is committed: Apache License 2.0, confirmed 30 Sep 2026 (BRIEF A6).
+
+# Python tooling
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+build/

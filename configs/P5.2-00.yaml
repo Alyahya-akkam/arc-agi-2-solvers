@@ -1,0 +1,301 @@
+# Run P5.2-00 (task P5.2, docs/tasks/P5.2.md): the free CPU check of the Qwen3.8-Flash-Next
+# SGLang stack before any GPU quota is spent. Read by scripts/fn_env.py (embedded as JSON by
+# scripts/build_fn_notebooks.py, so the Kaggle script needs no YAML); runbook
+# docs/runbooks/fn_probe.md. No pre-run brief: a CPU push spends no quota (BRIEF A9, ADR-008).
+
+# Run id: names the report and the summary.
+run_id: P5.2-00
+
+# The Kaggle script kernel the builder writes (scripts/build_fn_notebooks.py).
+kernel:
+  # Its own slug: no pre-run brief names it, so the gateway's CPU slug rule passes, and the GPU
+  # probe attaches this notebook's output by this name.
+  id: alyahya737/arc26-fn-env
+  # The title slugifies to the slug, as kaggle-cli expects.
+  title: arc26 fn env
+  # Code file name inside the push folder.
+  code_file: fn_env.py
+  # On: the steps that fetch a Python 3.12 or missing wheels need the network; CPU pushes may
+  # have it (kaggle_ops.py refuses internet only on accelerated pushes).
+  enable_internet: true
+  # null: Kaggle's latest image (pinning "latest"). The wheelhouse is cp312 and our pinned
+  # reference image runs cp311 (every run log); the latest image ran Python 3.12.13 in K0-latest
+  # (30 Sep) and is the digest delongyang's public 4 x L4 notebook records, so P5.2-01's GPU
+  # session gets the same Python (recipe R1, docs/research/flash_next_sglang.md on task/ideas).
+  # The alternative, dfranzen's pinned cp312 image
+  # (gcr.io/kaggle-private-byod/python@sha256:57e612b484cf3df5026ee4dcc3cb176974b22b2bc0937fb1e16132a8be4cb13c),
+  # has run only on RTX PRO 6000 sessions.
+  docker_image: null
+  # No accelerator: a CPU session, free, no brief.
+  accelerator: null
+  # The SGLang wheelhouse (6.6 GB, 131 wheels, cp312, CUDA 13; task brief, known facts).
+  dataset_sources: [dfranzen/pennyroyal-v253]
+  # Albucino's W4A16 weights with the FP8 n-gram table, and the MTP drafter (task brief).
+  model_sources:
+    - dfranzen/albucino-qwen3.8-flash-next-w4a16-fp8ple/Transformers/default/1
+    - dfranzen/albucino-qwen3-8-flash-next-drafter/Transformers/default/1
+  # The competition: only to confirm its mount path; no file in it is opened.
+  competition_sources: [arc-prize-2026-arc-agi-2]
+  # No kernel source: this notebook is the first link of the chain.
+  kernel_sources: {}
+  # Hard stop for the CPU push: the install of 6.6 GB of wheels takes minutes (dfranzen's
+  # launcher), the architecture scan reads about 10 GB of libraries, so an hour is ample.
+  timeout_s: 3600
+
+# Steps in order (scripts/fn_env.py, STEPS). fa2 runs in its own notebook (configs/P5.2-00-fa2.yaml)
+# so this check reports in minutes.
+# The fetch runs before the imports and the scan, so the FA2 wheel is checked like the rest.
+steps: [listing, python, venv, fetch, patch, imports, server_help, arch, model, template, package]
+
+# Folders. Absolute paths; tests and the smoke run put them under --root.
+paths:
+  # Where Kaggle mounts every input.
+  input_root: /kaggle/input
+  # Saved as the notebook's output, which the GPU probe attaches as a kernel source.
+  working: /kaggle/working
+  # Under run_logs/ so kaggle_ops.py pull's allowlist brings it back (json, txt, md only).
+  report_dir: /kaggle/working/run_logs/fn_env
+  # Wheels this run produced (fetch, fa2): kept in the output for P5.2-01, never pulled.
+  wheels_out: /kaggle/working/wheels
+  # A python-build-standalone 3.12 if one is fetched: in scratch, saved only as a tarball, since
+  # a tarball keeps the executable bits and symlinks a saved folder may lose.
+  python_out: /tmp/fn-env/python
+  # Scratch outside the saved output: the venv and the extracted uv are rebuilt in P5.2-01.
+  scratch: /tmp/fn-env
+
+# The listing step: the input tree, so the mount paths are read, not assumed (task brief).
+listing:
+  # Six levels reach /kaggle/input/models/<owner>/<slug>/transformers/default/1/<file>.
+  depth: 7
+  # A bound on the lines: the wheelhouse alone has 131 wheels.
+  max_entries: 4000
+  # Free disk where the venv and the output go (the venv is about 15 GB unpacked, estimate).
+  disk_paths: [/tmp, /kaggle/working]
+
+# The inputs, at the paths dfranzen's notebook uses (cell 4), each found by its marker file when
+# the path differs; the report records both.
+inputs:
+  wheelhouse:
+    # dfranzen's WHEELHOUSE_DIR.
+    path: /kaggle/input/datasets/dfranzen/pennyroyal-v253
+    # dfranzen's launcher reads this lock (cell 12, find_unique).
+    marker: requirements.lock
+    # Disambiguates a search hit.
+    hint: pennyroyal
+  model:
+    # dfranzen's MODEL_DIR pattern with this model's slug (lowercase framework, as mounted).
+    path: /kaggle/input/models/dfranzen/albucino-qwen3.8-flash-next-w4a16-fp8ple/transformers/default/1
+    # Every checkpoint has one.
+    marker: config.json
+    hint: fp8ple
+  drafter:
+    # dfranzen's DRAFT_MODEL_DIR.
+    path: /kaggle/input/models/dfranzen/albucino-qwen3-8-flash-next-drafter/transformers/default/1
+    marker: config.json
+    hint: drafter
+  competition:
+    # The K0 mount path (CLAUDE.md, human settings).
+    path: /kaggle/input/competitions/arc-prize-2026-arc-agi-2
+    # The challenges file; the solutions beside it are never opened.
+    marker: arc-agi_evaluation_challenges.json
+    hint: arc-prize-2026
+
+# Python 3.12 (step python).
+python:
+  # The wheelhouse's tag is cp312.
+  want: "3.12"
+  # always: fetch a standalone 3.12 even on a 3.12 image and keep it as a tarball, so P5.2-01
+  # still has a 3.12 if the latest image drifts before it runs (recipe, risk 9). The venv is
+  # built on the image's Python when it is 3.12.
+  standalone: always
+  # uv's request: its pinned python-build-standalone 3.12 build (uv knows the URLs).
+  uv_request: "3.12"
+  # A second route if uv's download fails: python-build-standalone's release asset. Empty: none;
+  # uv's route is the standard one.
+  fallback_url: ""
+  # Seconds for the download and unpack (about 30 MB).
+  timeout_s: 600
+  # Name of the tarball saved in /kaggle/working for P5.2-01.
+  tarball: python312.tar.gz
+
+# uv (dfranzen's launcher: the binary from the wheelhouse's uv wheel).
+uv:
+  # The wheel's name pattern.
+  wheel_glob: uv-*.whl
+  # No fallback on Kaggle: the wheelhouse ships uv.
+  fallback_path: null
+
+# The venv (dfranzen's launcher, cell 12).
+venv:
+  # Scratch: rebuilt in P5.2-01, so not saved.
+  prefix: /tmp/fn-env/venv
+  # The wheelhouse's wheels folder and lock (cell 12, find_unique).
+  wheels_dir: wheels
+  lock: requirements.lock
+  # The one SGLang wheel, reinstalled --no-deps after the lock, as cell 12 does.
+  sglang_glob: sglang-*.whl
+  reinstall_sglang_no_deps: true
+  # Seconds for the lock's install: 6.6 GB of wheels from the dataset mount.
+  timeout_s: 2400
+  # No other wheel folders here; P5.2-01 adds this run's output.
+  extra_find_links: []
+  # Versions the report states (the task brief's list, and FA2 once fetched).
+  report_versions: [sglang, sglang-kernel, sgl-kernel, torch, flashinfer-python, flashinfer-cubin,
+                    flashinfer-jit-cache, triton, tilelang, transformers, flash-attn-4, flash-attn,
+                    deep-gemm, nvidia-cuda-nvcc, uv]
+
+# Imports in the venv, one process each (step imports). No CUDA on a CPU session: errors are
+# expected and recorded, not fatal (task brief).
+imports:
+  # The task brief's four, then what the SGLang server imports at start, the tokenizer, and the
+  # recipe's R8 list: FA2 (flash_attn, its CUDA extension) beside FA4 (flash_attn.cute).
+  modules: [sglang, torch, flashinfer, sgl_kernel, triton, transformers, sglang.srt.server_args,
+            tilelang, deep_gemm, flash_attn, flash_attn_2_cuda, flash_attn.cute]
+  # Seconds per import: torch with CUDA 13 libraries takes about 20 s cold (estimate).
+  timeout_s: 300
+
+# The server's --help in the venv (step server_help): every flag of P5.2-01's engine.flags must
+# be in it, or SGLang stops at argument parsing on the GPU run.
+server_help:
+  # The probe's server entry point (configs/P5.2-01.yaml, engine.module).
+  module: sglang.launch_server
+  # Seconds: the help imports the server's modules (torch, sgl_kernel) once.
+  timeout_s: 300
+  # Where SGLang defines its arguments (add_argument calls): read too, since --help may fail
+  # on a session without CUDA.
+  source_files: [sglang/srt/server_args.py]
+  # The builder sets server_help.flags from this config's engine.flags (the flags it passes).
+  flags_from: configs/P5.2-01.yaml
+
+# CUDA architectures in every compiled file (step arch). The key answer: is sm89 there?
+arch:
+  # The L4 (Kaggle 4 x L4, P6.9-04's boot log).
+  target_sm: 89
+  # The task brief's list, with the FlashInfer wheels split as installed, FA4's package, and
+  # FA2's top-level extension module (a glob: it is not a package folder).
+  packages: [sgl_kernel, flashinfer, flashinfer_jit_cache, flashinfer_cubin, torch, triton,
+             deep_gemm, tilelang, flash_attn, "flash_attn_2_cuda*.so", sglang]
+  # Files per package, largest first: torch has about 60 .so files, the JIT cache hundreds.
+  max_files: 5000
+  # cuobjdump cross-checks of the parser on this many files per package when the wheels bundle
+  # the tool (the parser reads every file; the tool is slow on 1 GB libraries).
+  cuobjdump_files: 3
+  # Packages that compile kernels at run time, so "no device code" is expected of them.
+  jit_notes:
+    triton: compiles PTX and cubins at run time with its bundled ptxas; no device code expected
+    tilelang: JIT through its TVM backend at run time
+    deep_gemm: JIT at run time; its kernels target sm90 and newer
+    sglang: Python, plus JIT kernels at run time
+
+# The model and the drafter (step model).
+model:
+  # Shards whose headers are read (headers only; Albucino's build has about 30 files).
+  max_shards: 400
+  # Tensor name rules, first match wins (Qwen4Exp names, docs/research/flash_next_shot.md
+  # section 1 on task/ideas): the n-gram table (PLE), routed experts, shared experts, the vision
+  # tower, MTP, the Gated DeltaNet layers, QSA attention, embeddings and head, the router, and
+  # the hyper-connections; the rest is "other".
+  components:
+    - [ple, "ngram|engram|ple_emb|per_layer_emb"]
+    - [experts, "\\.experts\\."]
+    - [shared_experts, "shared_expert"]
+    - [vision, "visual|vision"]
+    - [mtp, "(^|\\.)mtp\\."]
+    - [linear_attn, "linear_attn"]
+    - [attention, "self_attn|\\.attn\\.|indexer"]
+    - [embed_head, "embed_tokens|lm_head"]
+    - [router, "\\.gate\\.weight|router"]
+    - [hyper_connections, "hyper|\\.hc_"]
+  # Text config keys the report states (the memory arithmetic of the brief needs them).
+  report_keys: [num_hidden_layers, num_experts, num_experts_per_tok, moe_intermediate_size,
+                hidden_size, num_attention_heads, num_key_value_heads, head_dim,
+                full_attention_interval, max_position_embeddings, ple_embedding_dtype,
+                mamba_ssm_dtype, vocab_size]
+  # The 27B's tokenizer.json sha256 (the research note's TOKENIZER_SHA): equal means our
+  # prompts, parser, and degenerate-token ids carry over unchanged.
+  tokenizer_sha256: 06b9509352d2af50381ab2247e083b80d32d5c0aba91c272ca9ff729b6a0e523
+
+# The chat template, rendered by the venv's tokenizer (step template), so P5.2-01's own
+# rendering for /generate can be checked against it.
+template:
+  # Short texts: only the template's frame matters here.
+  system: "S"
+  user: "U"
+  # xhigh: P6.9-01's effort; default and thinking off show what the variable changes.
+  variants:
+    xhigh: {reasoning_effort: xhigh}
+    default: {}
+    thinking_off: {enable_thinking: false}
+  # Token ids of the markers the probe's forcing and parsing rely on.
+  markers: ["<think>", "</think>", "<|im_start|>", "<|im_end|>", "<|endoftext|>"]
+  # P6.9-01's thinking_end_note (configs/P6.9-01.yaml, direct section): its token count sizes
+  # the forcing request.
+  note: "\n\nI have used my whole thinking budget, so I stop reasoning here and write my final answer blocks now, best first.\n"
+  # Seconds: a tokenizer load and three renders.
+  timeout_s: 300
+
+# Missing wheels (step fetch), from the researcher's recipe (docs/research/flash_next_sglang.md
+# on task/ideas, R3): classic FlashAttention 2, which SGLang's QSA decode needs on sm89
+# (sgl-project/sglang#36968). Kept in /kaggle/working/wheels for P5.2-01.
+fetch:
+  # Direct downloads: {name, url, sha256 (or null), module to import after install}.
+  urls:
+    # FA2 2.8.3 for torch 2.13 + CUDA 13.0 + cp312 (mjun0812/flash-attention-prebuild-wheels
+    # v0.9.47, 242,531,524 bytes; recipe R3). No published sha256: the run records it. Its zip
+    # has no flash_attn/cute, so it sits beside Pennyroyal's flash_attn_4.
+    - name: flash_attn_2
+      url: https://github.com/mjun0812/flash-attention-prebuild-wheels/releases/download/v0.9.47/flash_attn-2.8.3%2Bcu130torch2.13-cp312-cp312-linux_x86_64.whl
+      file: flash_attn-2.8.3+cu130torch2.13-cp312-cp312-linux_x86_64.whl
+      sha256: null
+      module: flash_attn
+  # pip download specs: {spec, args (index, platform, python version), module}.
+  pip: []
+
+# The recipe's one edit (R4): with FP8 KV the fork sizes FA2's packed decode scratch in the
+# pool's dtype (FP8), which FA2 refuses; the scratch takes the query's dtype (upstream #38851).
+# Here it is only checked on the CPU venv (apply false) and the code around it saved
+# (patch_<name>_context.txt) to confirm the variable name; P5.2-01 applies it.
+patches:
+  apply: false
+  items:
+    - name: fa2_scratch_dtype
+      # Relative to the venv's site-packages.
+      file: sglang/srt/layers/attention/qwen_sparse_attn_backend.py
+      # The file at the fork's d00d88e (recipe R4).
+      sha256_before: 2ce24d66d6a0bff0e22ff0819291649a4169937f32c5c28241215c6eb119ad54
+      # The 4-line block starting scratch_capacity, in _forward_paged_attention; the other
+      # k_buffer.dtype (the sm100/sm120 TRT-LLM path) does not follow these three arguments.
+      pattern: "(scratch_capacity,\\s*k_buffer\\.shape\\[1\\],\\s*k_buffer\\.shape\\[2\\],\\s*)k_buffer\\.dtype,"
+      replacement: "\\g<1>q.dtype,"
+      count: 1
+
+# Environment of every venv command: dfranzen's values that matter without a GPU.
+env:
+  # One thread pool per process: a CPU session has 4 cores.
+  OMP_NUM_THREADS: "4"
+  # No tokenizer threads warning in the template step.
+  TOKENIZERS_PARALLELISM: "false"
+  # No network from Hugging Face libraries: every file is local.
+  HF_HUB_OFFLINE: "1"
+  TRANSFORMERS_OFFLINE: "1"
+
+# The CPU smoke (scripts/fn_env.py --smoke --root <dir>): a fake input tree, the system uv, the
+# running Python, a file:// fetch, and no network.
+smoke:
+  run_id: P5.2-00-smoke
+  python: {want: auto, standalone: never}
+  uv: {fallback_path: PATH}
+  venv: {timeout_s: 300}
+  imports: {modules: [fnfake, sgl_kernel], timeout_s: 60}
+  # The standard library's http.server stands in for the server's --help.
+  server_help: {module: http.server, timeout_s: 60, flags: [--bind, --directory, --not-a-flag]}
+  arch: {packages: [fnfake, flashinfer], cuobjdump_files: 0}
+  fetch:
+    urls:
+      - {name: fnextra, url: "file://{root}/kaggle/input/fake-extra/fnextra-0.2-py3-none-any.whl", sha256: null, module: fnextra}
+    pip: []
+  # The fake wheel's module stands in for the patched file.
+  patches:
+    apply: false
+    items:
+      - {name: fake_edit, file: fnfake/__init__.py, sha256_before: null, pattern: "__version__ = '(0\\.1)'", replacement: "__version__ = '\\g<1>'", count: 1}

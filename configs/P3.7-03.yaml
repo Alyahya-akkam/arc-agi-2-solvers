@@ -1,0 +1,148 @@
+# Submission notebook build for run P3.7-03: arm (f), H's adapter as the start of the solver's full
+# per-puzzle fine-tuning, against arm (c), the same fine-tuning from the initial weights, paired
+# on DEV40 (task brief docs/tasks/P3.7.md, amendment 8; ADR-019), with arms (a), the zero
+# adapter, and (b), H alone, for P3.7-01's G4 reading on MT-03's later best point (brief revision
+# 2). Arms (c) and (f) run arc26.ttt.fit with the same arguments (rank 16 on q, k, v, o, one epoch
+# over the 128 views, the reference's AdamW, learning rate, and cosine schedule); only the
+# starting adapter differs, so (f) minus (c) isolates it. Read by scripts/build_submission.py and
+# scripts/build_kaggle_notebook.py with yaml.safe_load; runbook docs/runbooks/h_validation.md;
+# pre-run brief docs/prerun/P3.7-03.md.
+# Never submitted: the builder refuses it for the submission notebook.
+
+# A new private notebook for this run: P3.7-01's notebook keeps its output (the record reads it).
+kaggle_notebook: alyahya737/arc26-h-val-fit
+
+# A new private code dataset: this build's wheel differs from P3.7-01's and P3.7-02's (arm (f),
+# train_log), and those notebooks check their wheel by sha256 in the unversioned
+# alyahya737/arc26-code-p37, so a new version there would break P3.7-02 (one code dataset per
+# concurrent build lineage).
+code_dataset: alyahya737/arc26-code-p37f
+
+# Competition attached: it mounts DEV40's challenges and, development mode only, its solutions
+# (the scores and the answers' CE), and only notebooks attached to it get 4xL4.
+competition: arc-prize-2026-arc-agi-2
+
+# 4xL4, bf16, P3.7-01's hardware, whose measured per-puzzle times price this run; no fallback
+# (NvidiaL4X1 is not granted, T4 has no bf16).
+accelerator: NvidiaL4
+
+# Same pinned image and install notebook source as every build (ADR-010).
+reference_metadata: reference/kernel-metadata.json
+
+# Same install notebook version as every build (see configs/submission_P0.5-01.yaml).
+kernel_source_versions:
+  sorokin/pip-install-unsloth-flash-patch: 2
+
+# Same model folder name as every build (K0).
+model_slug: qwen3_4b_grids15_sft139
+
+# DEV40 (arc26.data.DEV40, 40 tasks, 55 test outputs), P3.7-01's set, so arms (a), (b), (c) repeat
+# P3.7-01's (4.0, 4.0, 9.5 of 40) and (c) the reference rows (10.5 of 40, P2.6-01's DEV40 subset).
+subset: [
+  "136b0064", "16de56c4", "195c6913", "20a9e565", "28a6681f", "2ba387bc", "31f7f899",
+  "332f06d7", "3e6067c3", "446ef5d2", "45a5af55", "4a21e3da", "581f7754", "5961cc34",
+  "64efde09", "7b0280bc", "7b5033c1", "7c66cb00", "80a900e0", "8698868d", "89565ca0",
+  "8f3a5a89", "9385bd28", "a25697e4", "b0039139", "b10624e5", "b5ca7ac4", "c7f57c3e",
+  "cbebaa4b", "db0c5428", "db695cfb", "dbff022c", "dd6b8c4b", "de809cff", "dfadab01",
+  "e12f9a14", "e3721c99", "e376de54", "eee78d87", "f560132c",
+]
+
+# One worker per L4, as P3.7-01: the per-arm timings transfer.
+workers: 4
+
+# Same PYTHONHASHSEED as every run since run A: one fixed seed for all comparisons (CLAUDE.md).
+hash_seed: 0
+
+# The run solves DEV40 once, under every arm.
+run_solver: true
+
+# Seconds after the notebook's first cell: the soft deadline, after which no puzzle starts. The
+# expected last worker ends about 14,770 s after the first cell (estimate, the brief's section 6:
+# P3.7-01's measured per-puzzle (a), (b), (c) times, (f) as (c) plus H's encode, replayed on four
+# workers in the queue's order, setup 1,250 s), about 15,510 s if (f) decodes 20% slower than
+# (c); 16,200 s cuts nothing then.
+solver_end_s: 16200
+
+# Seconds after the notebook's first cell: the hard stop, the soft deadline plus finish_s plus
+# 900 s for the arms' selection and scores (builder rule). The brief's Timeout is this plus 300 s
+# for the logs plus 2,700 s, the pre-script allowance: Kaggle has spent up to about 41 minutes
+# between RUNNING and the first cell (P6.5-02, P6.3-02), and the Timeout may count from RUNNING.
+solver_kill_s: 21000
+
+# The split solver (ADR-011): arc26.arms calls arc26.ttt.fit and decode_puzzle apart.
+solver: split
+
+# H's scope (ADR-002, ADR-017; configs/hypernet.yaml): the live adapter of every arm, P2.6-01's
+# and P3.7-01's arm (c) scope, so (c) is that build and H's adapter fills the same adapter.
+scope:
+  # Rank 16, rsLoRA scale alpha / sqrt(r) = 32 / 4 = 8, H's rank and alpha.
+  lora_r: 16
+  # q, k, v, o on all 36 layers, H's targets; embed_tokens and lm_head frozen.
+  lora_targets: [q_proj, k_proj, v_proj, o_proj]
+
+# The adapter arms (task P3.7, amendment 8): development runs only; a competition rerun ignores
+# them.
+adapters:
+  # Every DEV40 puzzle runs the four arms in this order, P3.7-01's for (a) to (c), before the next.
+  arms:
+    - name: base
+      source: base
+      reason: (a) the zero adapter, the base itself, the low end of G4's gap (P3.7-01's arm)
+    - name: h
+      source: hyper
+      reason: (b) H's adapter alone from MT-03's best point, G4's second read (P3.7-01's arm)
+    - name: sgd
+      source: sgd
+      reason: (c) P2.6-01's one-epoch fit from the initial weights, the reference of the start
+    - name: h-fit
+      source: hyper_fit
+      reason: (f) the same one-epoch fit from H's adapter, the start the human asked to test
+  # Every training arm logs its per-step loss, learning rate, and gradient norm (the brief's
+  # question: does (f) reach (c)'s final loss sooner); logging reads the loss only.
+  train_log: true
+  # null: the reference's 16 views per test input, P2.6-01's and P3.7-01's decode.
+  views: null
+  # The queue's shuffled order (arc26.arms.queue_order): P3.7-01's seed, so the same order.
+  order_seed: 0
+  # The teacher-forced CE of every answer under every arm, as P3.7-01 (development mode only).
+  ce: true
+  # Seconds after the soft deadline that a started puzzle may take to finish its four arms: the
+  # longest DEV40 puzzle's (e3721c99, P3.7-01) take about 3,520 s, 3,710 s if (f) decodes 20%
+  # slower than (c).
+  finish_s: 3900
+  # H's best point after MT-03 (the three-key swap, brief revision 2): MT-03's best.pt in its output
+  # alyahya737/arc26-mt-train-2 version 1, step 3,400 of 5,600 (status.json best.step, written by
+  # that session, best.session_start 1028), validation CE 0.023905 against the zero adapter's
+  # 0.029248. MT-02's step 1,000 (P3.7-01's) is no longer the best. A later best point (MT-04)
+  # changes this line, load_check.run_logs, and their notebook_inputs entries again.
+  checkpoint: "{input:alyahya737/arc26-mt-train-2}/checkpoints/best.pt"
+  # MT-01's embedding cache (version 1), read only: DEV40's pairs are not in it, so the workers
+  # encode them live, as P3.7-01; the load check reads the validation pairs from it.
+  cache: "{input:alyahya737/arc26-mt-cache}/embedding_cache"
+  # The expected H config: best.pt's must equal it, and the scope above its.
+  hypernet: configs/hypernet.yaml
+  # P3.4's build 2 and its passing leakage check, for the load check's 286 validation episodes.
+  episodes_root: "{input:alyahya737/arc26-p3-4-episodes}"
+  check_root: "{input:alyahya737/arc26-p3-4-leakage}"
+  # Build 2's manifest (docs/experiments/P3.4.md); best.pt's config must name the same.
+  manifest_sha256: b1f2cd0413efdbe8d00152dd98e76181556907f22477e3079cc07746ad8b7aa8
+  # H's load check before any decode, as P3.7-01 (passed there on MT-02's step 1,000, 749 s): here
+  # it must reproduce MT-03's step 3,400 per episode (mean current 0.023905, zero 0.029248).
+  load_check:
+    # MT-03's run logs, the last session's: status.json names the best step over both sessions
+    # (3,400), metrics.jsonl holds every validation from step 0, its per-episode CEs included.
+    run_logs: "{input:alyahya737/arc26-mt-train-2}/run_logs"
+    # P3.7-01's tolerances and reasons (configs/P3.7-01.yaml): 40 times below neighbouring
+    # validations' smallest change, 2,000 times above the log's rounding.
+    max_abs: 1.0e-3
+    max_mean: 1.0e-4
+  # null: the competition's DEV40, not GEN.
+  gen: null
+
+# The outputs the arms read, pinned: MT-03's (H and its logs), MT-01's (the cache), P3.4's build 2
+# and its check. On a checkpoint swap only the first entry changes.
+notebook_inputs:
+  alyahya737/arc26-mt-train-2: 1
+  alyahya737/arc26-mt-cache: 1
+  alyahya737/arc26-p3-4-episodes: 2
+  alyahya737/arc26-p3-4-leakage: 2

@@ -1,0 +1,160 @@
+{
+  "run": "runs/P6.10-02",
+  "base": {
+    "file": "tests/testdata/p6_5_03_engine_windows.json",
+    "source_sha256": "aa56fb4fea2bb9f0294f426ce495b0e70ae79a26e8651b00c6e9f17742ef35ed"
+  },
+  "fit": {
+    "a": 0.04392408679849042,
+    "b": 3.36106787288898e-08,
+    "c": -0.0005238350942271764,
+    "rows": 673,
+    "rms": 0.00633,
+    "max": 0.01774,
+    "n_range": [
+      11,
+      15
+    ],
+    "s_max": 1086023
+  },
+  "kv_pool": null,
+  "bands": [
+    {
+      "band": [
+        0,
+        16384
+      ],
+      "pairs": 0,
+      "seconds": 0,
+      "tokens": 0,
+      "rate": null,
+      "base_rate": null,
+      "q": null,
+      "q_15": null,
+      "pairs_15": 0,
+      "n": null,
+      "context_mean": null,
+      "beyond_base_s": 0,
+      "out_of_reach": 0,
+      "pairs_low_n": 0,
+      "q_low_n": null
+    },
+    {
+      "band": [
+        16384,
+        32768
+      ],
+      "pairs": 0,
+      "seconds": 0,
+      "tokens": 0,
+      "rate": null,
+      "base_rate": null,
+      "q": null,
+      "q_15": null,
+      "pairs_15": 0,
+      "n": null,
+      "context_mean": null,
+      "beyond_base_s": 0,
+      "out_of_reach": 0,
+      "pairs_low_n": 0,
+      "q_low_n": null
+    },
+    {
+      "band": [
+        32768,
+        49152
+      ],
+      "pairs": 0,
+      "seconds": 0,
+      "tokens": 0,
+      "rate": null,
+      "base_rate": null,
+      "q": null,
+      "q_15": null,
+      "pairs_15": 0,
+      "n": null,
+      "context_mean": null,
+      "beyond_base_s": 0,
+      "out_of_reach": 0,
+      "pairs_low_n": 0,
+      "q_low_n": null
+    },
+    {
+      "band": [
+        49152,
+        null
+      ],
+      "pairs": 0,
+      "seconds": 0,
+      "tokens": 0,
+      "rate": null,
+      "base_rate": null,
+      "q": null,
+      "q_15": null,
+      "pairs_15": 0,
+      "n": null,
+      "context_mean": null,
+      "beyond_base_s": 0,
+      "out_of_reach": 0,
+      "pairs_low_n": 0,
+      "q_low_n": null
+    }
+  ],
+  "concurrency": {
+    "max_running": null,
+    "max_waiting": null,
+    "preemptions": null
+  },
+  "speculation": {
+    "drafts": null,
+    "draft_tokens": null,
+    "accepted": null,
+    "acceptance_rate": null,
+    "mean_acceptance_length": null
+  },
+  "kv_units": {
+    "run": null,
+    "base": {
+      "blocks": 1167,
+      "block": 1568,
+      "overhead": 3.5,
+      "tokens_per_block": 1456.3547557840618
+    }
+  },
+  "calls": {
+    "total": 0,
+    "errors": 0,
+    "cancelled_at_stop": 0
+  },
+  "engine_log": {
+    "bytes": 28920,
+    "error": 0,
+    "lines": 235,
+    "nan": 0,
+    "present": true,
+    "spec_decode": 0,
+    "traceback": 0,
+    "during_run": {
+      "tracebacks": 0,
+      "errors": 0,
+      "tracebacks_after": 0,
+      "errors_after": 0
+    }
+  },
+  "tracebacks": [],
+  "shot": {
+    "queued": 15,
+    "waves": 0,
+    "shot_tasks": 0,
+    "used": 0,
+    "stopped": "the engine was not up (see run.json's problems)"
+  },
+  "decision": {
+    "row": "Fault",
+    "reasons": [
+      "no engine samples",
+      "the pool's source None is not the base's 'engine log', or no cache_config converts KV use",
+      "the last band has 0 pairs, under 6: the base reference cannot be matched there"
+    ]
+  }
+}

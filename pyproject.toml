@@ -1,0 +1,65 @@
+[build-system]
+requires = ["hatchling>=1.24"]
+build-backend = "hatchling.build"
+
+[project]
+name = "arc26"
+version = "0.0.1"
+description = "ARC-AGI-2 solvers: test-time training, LLM program synthesis, a demonstrations-to-LoRA hypernetwork"
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+requires-python = ">=3.11"
+# Runtime dependencies (torch, transformers, peft, ...) are added by the task that first imports
+# them, as lower bounds. On Kaggle they come from the pinned image and the install notebook: the
+# notebook installs the arc26 wheel with --no-deps, so this list never changes that stack (ADR-010).
+dependencies = []
+
+[project.optional-dependencies]
+# numpy: CPU tests import the moved notebook code (arc26/nvarc) and arc26.hyper.episodes (P3.4),
+# which need numpy; Kaggle's pinned image provides numpy 2.2.6 at run time.
+# httpx: the agent solver's engine client (P6.2) and its tests against a local fake server.
+dev = ["pytest>=8", "ruff>=0.6", "pyyaml>=6", "numpy>=2", "httpx>=0.27"]
+# arc26.hyper. Lower bounds that Kaggle's pinned image satisfies (P1.1-01 pip_freeze.txt: torch
+# 2.8.0, transformers 4.55.4, peft 0.17.1, safetensors 0.6.2), so the notebook's
+# `--no-index --no-deps` install never replaces them (docs/STATE.md, conflict 4). pyyaml reads
+# configs/hypernet.yaml (`HypernetConfig.from_yaml`); its bound is dev's, and the image ships
+# PyYAML 6.0.3 (run P1.1-01's pip freeze).
+hyper = ["torch>=2.8", "transformers>=4.55.4", "peft>=0.17.1", "safetensors>=0.6.2", "pyyaml>=6"]
+# arc26.agent (P6, ADR-020): the OpenAI-compatible engine client. On Kaggle it comes from the
+# offline wheel set of the agent stack (P6.3), installed beside vLLM.
+agent = ["httpx>=0.27"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["arc26"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+# reference/ holds the third-party notebook verbatim (BRIEF A6); it is never edited, so not linted.
+# arc26/nvarc/ holds its code moved into the package by scripts/extract_reference.py (P0.1,
+# ADR-009): lint fixes would change moved code, so tests/test_extraction.py guards it instead.
+extend-exclude = ["reference", "arc26/nvarc"]
+
+[tool.ruff.lint]
+# D and ANN enforce the A3 contract (docstrings and type hints on public code) in CI.
+select = ["E", "F", "W", "I", "B", "UP", "D", "ANN"]
+# D105/D107: magic methods and __init__ are documented in the class docstring (Google style).
+# ANN401: Any is allowed where a signature is genuinely dynamic (e.g. wrapped notebook code).
+ignore = ["D105", "D107", "ANN401"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["D", "ANN"]
+# Triton kernels (task P5.5): @triton.jit reads argument annotations as specialization hints,
+# so the kernel signatures stay bare.
+"scripts/fn_kvq/triton_kernels.py" = ["ANN001", "ANN202"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--strict-markers"
+markers = [
+    "gpu: needs a CUDA GPU; never run by the agent, run by the human per docs/runbooks/",
+]

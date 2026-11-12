@@ -1,0 +1,5 @@
+# Latest validated FOMAML-trained H, immutable private dataset version2.
+dataset: alyahya737/arc26-p3-9-01
+version: 2
+filename: best.pt
+sha256: a8809762dc852f76a44b67353cb8f3b35182ac1a9231766d848bf68b39d58ca6

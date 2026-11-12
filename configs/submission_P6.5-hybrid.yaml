@@ -1,0 +1,139 @@
+# Submission notebook build of the hybrid (task P6.5, ADR-020), the final pick's build: NVARC runs
+# first for its share of the session, then the agent solver (Qwen3.8-27B writing Python programs
+# that must reproduce every demonstration) works on all tasks, NVARC's attempts the fill and the
+# fallback at every moment. P2.6-01's config (Submission 2: rank 16 on q, k, v, o in both modes,
+# the split solver, DEV120, four workers on NvidiaL4, the competition deadlines) with the agent
+# stage added at the scored rerun's times, on its own code dataset. Run P6.5-01
+# (configs/submission_P6.5-01.yaml) measures the same build on DEV40 at a sixth of these times.
+# Read by scripts/build_submission.py and scripts/build_kaggle_notebook.py with yaml.safe_load;
+# runbook docs/runbooks/build_submission.md (hybrid build). Fit to submit: the submission
+# notebook, four workers on NvidiaL4, no series; a competition rerun of its version runs the same
+# stages with the same times. No run of its own is briefed yet: a version of it is made by a push,
+# whose development run lasts until the agent's generation stop (P6.4's phase 4 cycles until then).
+
+# The one notebook submissions come from (docs/SUBMITTING.md): the final picks come from it, and
+# a version of this build is one of them if P6.5-01's row and its own brief's say so.
+kaggle_notebook: alyahya737/arc26-submission
+
+# This build lineage's own private code dataset (the human, 9 Oct: one code dataset per
+# concurrent build lineage): P2.6's arc26-code-p26 holds Submission 2's wheel, which a rerun of
+# its version still reads; this wheel adds arc26.agent. P6.5-01 and P6.5-agent share it (one
+# commit, one wheel).
+code_dataset: alyahya737/arc26-code-p65
+
+# Competition attached: it mounts the data, and only notebooks attached to it get 4xL4.
+competition: arc-prize-2026-arc-agi-2
+
+# 4xL4: NVARC's four workers, then the engine's tensor parallelism 4 (the INT4 27B needs at least
+# two L4s); bf16 for NVARC, compute capability 8.9. The scored rerun's hardware. No fallback
+# (NvidiaL4X1 is not granted, T4 has no bf16).
+accelerator: NvidiaL4
+
+# Same pinned image and install notebook source as every build (ADR-010); the engine runs from its
+# own venv with the image's PYTHONPATH removed.
+reference_metadata: reference/kernel-metadata.json
+
+# Same install notebook version as every build (see configs/submission_P0.5-01.yaml).
+kernel_source_versions:
+  sorokin/pip-install-unsloth-flash-patch: 2
+
+# Same model folder name as every build (K0): NVARC's base model.
+model_slug: qwen3_4b_grids15_sft139
+
+# DEV120: every public evaluation task (BRIEF B4), 120 tasks and 172 test inputs (K0), P2.6-01's
+# tasks, so NVARC's part compares with its 38.33 of 120 and the agent's gain is read on top.
+subset: null
+
+# One worker per L4, as P2.6-01 and the scored rerun (production: submission_blocker).
+workers: 4
+
+# Same PYTHONHASHSEED as P2.6-01 and every run since run A: one fixed seed for all comparisons.
+hash_seed: 0
+
+# NVARC solves DEV120 (until its share), then the agent stage runs.
+run_solver: true
+
+# Seconds after the start: NVARC's soft deadline without the agent, the notebook's competition
+# value (12 h minus 30 min), as P2.6-01; the agent's share below cuts it to 21,600 s in both modes,
+# so this development run measures the rerun's timing.
+solver_end_s: 41400
+
+# Seconds after the start: NVARC's hard stop without the agent, the competition value (12 h minus
+# 20 min); the share cuts it to 22,200 s. Used as is when the agent stage cannot follow.
+solver_kill_s: 42000
+
+# The split solver (ADR-011, the default since 2 Oct), as P2.6-01: Submission 2's NVARC.
+solver: split
+
+# NVARC's LoRA scope in both modes, P2.6-01's (task P2.6, ADR-018): P1.3-01 arm 2 (r16-attn),
+# 38.33 of 120 on DEV120 in P2.6-01 at 499.5 s per puzzle.
+scope:
+  # Rank 16, rsLoRA scale alpha / sqrt(r) = 32 / 4 = 8 (the reference's alpha of 32).
+  lora_r: 16
+  # q, k, v, o on all 36 layers; embed_tokens and lm_head frozen (P1.3-01 arm 2, H's scope).
+  lora_targets: [q_proj, k_proj, v_proj, o_proj]
+
+# The agent stage (task P6.5, ADR-020; builder key agent), in both modes. Seconds count from the
+# notebook's start; docs/runbooks/build_submission.md (hybrid build) derives the plan.
+agent:
+  # On: the stage runs when the agent check passes. The Config cell's AGENT['enabled'] can turn it
+  # off for a version without rebuilding (NVARC then keeps its full deadlines).
+  enabled: true
+  # NVARC's share, its soft deadline: 6 h, a placeholder until the spike (P6.3-01, P6.3-02)
+  # reports the agent's solves per hour (the design note's scenario S2, agent_library_design.md
+  # 5.5). On DEV120 NVARC ends near 15,700 s (P2.6-01), before the share; on 240 hidden tasks at
+  # P2.6-01's 499.5 s per puzzle on four workers it reaches about 173 tasks by 21,600 s.
+  nvarc_share_s: 21600
+  # The agent's session end, passed as arc26.agent.run's --deadline: 12 h minus 20 min, the
+  # competition hard stop's, so 18 min stay after SIGKILL (the kill wait, the final check, the
+  # logs, and Kaggle's runtime variance of up to 10 min). Generation stops the run config's
+  # final_margin_s (1,800 s) earlier, at 40,200 s.
+  end_s: 42000
+  # Seconds between SIGTERM and SIGKILL of the agent at end_s: on SIGTERM arc26.agent.run stops
+  # its engine (SIGTERM, up to stop_timeout_s 60 s, then SIGKILL and up to 30 s) and writes once
+  # more; 120 s covers that with room.
+  term_s: 120
+  # The stage starts only with this much left before the generation stop: the install (3 to 5
+  # min, docs/runbooks/agent_spike.md) and the boot (5 to 15 min, the spike's estimate) leave
+  # about 10 min of generation at the least; with less, NVARC's file stands.
+  min_stage_s: 1800
+  # Seconds for the offline install of the wheelhouse, the spike's limit (configs/P6.3-01.yaml,
+  # wheels.timeout_s); it is also cut at the generation stop.
+  install_timeout_s: 1500
+  # The agent's run config (task P6.4): phases, governor, sandbox, engine client, and the vLLM
+  # server's flags (the spike's stage 1); embedded in the notebook, its sha256 in BUILD.
+  config: configs/agent_default.yaml
+  # The weights: the download notebook's output (configs/P6.3-download.yaml on task/P6.3b, model),
+  # as P6.3-02 attaches it.
+  model:
+    # The notebook that downloaded and verified RedHatAI/Qwen3.8-27B-INT4 (ADR-020, decision 6).
+    notebook: alyahya737/arc26-dl-qwen38-int4
+    # Its first run's output; if a second run is needed, this pin changes, and so does the brief's
+    # Code-commit.
+    version: 1
+    # The folder of that output holding the 12 repository files; vLLM loads it from the mount.
+    folder: qwen38-27b-int4
+    # The revision the download verified, every file's sha256 against the Hub's; its MANIFEST.json
+    # must name it.
+    revision: 91bd022d5b49442a868bc35008f6c21e1860edfa
+  # The engine: the wheels notebook's output (configs/P6.3-download.yaml, wheels).
+  wheels:
+    # The notebook that downloaded vLLM 0.31.0 and its closure as binary wheels for Python 3.11
+    # and checked their offline install on the pinned image.
+    notebook: alyahya737/arc26-dl-agent-wheels
+    # Its first run's output, as P6.3-02 attaches it.
+    version: 1
+    # The folder holding the wheels, their MANIFEST.json, and install_wheelhouse.py.
+    folder: wheelhouse
+    # The engine version its MANIFEST.json must list (ADR-020; models note, section 4.1).
+    vllm: 0.31.0
+  # The interpreter that makes the engine's venv: the image's Python 3.11.13, the one the wheels
+  # notebook's install check used (configs/P6.3-02.yaml, wheels.base_python); the kernel's own when
+  # missing.
+  base_python: /usr/bin/python3.11
+  # Scratch for the venv (about 10 GB), the engine's caches (the run config's env), NVARC's
+  # copies, and the agent's logs: /tmp had about 1.1 TB free in every probe (K0); never saved.
+  scratch_dir: /tmp/arc26-agent
+  # The oldest NVIDIA driver for the engine's CUDA 13.0 runtime (torch 2.13 cu130); Kaggle's L4
+  # sessions reported 580.159.04 (P0.1-01 run A) and 580.178.04 (P2.0-01, P2.1-03, MT-01).
+  min_driver: 580.65.06

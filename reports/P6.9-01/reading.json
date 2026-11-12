@@ -1,0 +1,181 @@
+{
+ "buckets": {
+  "(0, 0.5)": {
+   "tasks": 4,
+   "nvarc": 0.0,
+   "shot": 0.5,
+   "merged": 0.5,
+   "net": 0.5,
+   "gained": [
+    "247ef758"
+   ],
+   "lost": [],
+   "shot_solved": []
+  },
+  "[0.5, 0.7)": {
+   "tasks": 6,
+   "nvarc": 2.0,
+   "shot": 2.0,
+   "merged": 3.0,
+   "net": 1.0,
+   "gained": [
+    "b0039139"
+   ],
+   "lost": [],
+   "shot_solved": [
+    "a395ee82",
+    "b0039139"
+   ]
+  },
+  "[0.85, 1]": {
+   "tasks": 5,
+   "nvarc": 5.0,
+   "shot": 3.5,
+   "merged": 5.0,
+   "net": 0.0,
+   "gained": [],
+   "lost": [],
+   "shot_solved": [
+    "1818057f",
+    "6e453dd6",
+    "e8686506"
+   ]
+  }
+ },
+ "tasks": {
+  "97d7923e": {
+   "bucket": "(0, 0.5)",
+   "confidence": 0.400111,
+   "nvarc": 0.0,
+   "shot": 0.0,
+   "merged": 0.0
+  },
+  "247ef758": {
+   "bucket": "(0, 0.5)",
+   "confidence": 0.404549,
+   "nvarc": 0.0,
+   "shot": 0.5,
+   "merged": 0.5
+  },
+  "7b3084d4": {
+   "bucket": "(0, 0.5)",
+   "confidence": 0.417932,
+   "nvarc": 0.0,
+   "shot": 0.0,
+   "merged": 0.0
+  },
+  "898e7135": {
+   "bucket": "(0, 0.5)",
+   "confidence": 0.422555,
+   "nvarc": 0.0,
+   "shot": 0.0,
+   "merged": 0.0
+  },
+  "142ca369": {
+   "bucket": "[0.5, 0.7)",
+   "confidence": 0.588239,
+   "nvarc": 0.0,
+   "shot": 0.0,
+   "merged": 0.0
+  },
+  "88e364bc": {
+   "bucket": "[0.5, 0.7)",
+   "confidence": 0.64665,
+   "nvarc": 0.0,
+   "shot": 0.0,
+   "merged": 0.0
+  },
+  "a25697e4": {
+   "bucket": "[0.5, 0.7)",
+   "confidence": 0.673129,
+   "nvarc": 0.0,
+   "shot": 0.0,
+   "merged": 0.0
+  },
+  "a395ee82": {
+   "bucket": "[0.5, 0.7)",
+   "confidence": 0.682514,
+   "nvarc": 1.0,
+   "shot": 1.0,
+   "merged": 1.0
+  },
+  "b5ca7ac4": {
+   "bucket": "[0.5, 0.7)",
+   "confidence": 0.688807,
+   "nvarc": 1.0,
+   "shot": 0.0,
+   "merged": 1.0
+  },
+  "b0039139": {
+   "bucket": "[0.5, 0.7)",
+   "confidence": 0.699801,
+   "nvarc": 0.0,
+   "shot": 1.0,
+   "merged": 1.0
+  },
+  "e8686506": {
+   "bucket": "[0.85, 1]",
+   "confidence": 0.955948,
+   "nvarc": 1.0,
+   "shot": 1.0,
+   "merged": 1.0
+  },
+  "7ed72f31": {
+   "bucket": "[0.85, 1]",
+   "confidence": 0.999028,
+   "nvarc": 1.0,
+   "shot": 0.5,
+   "merged": 1.0
+  },
+  "6e453dd6": {
+   "bucket": "[0.85, 1]",
+   "confidence": 0.999475,
+   "nvarc": 1.0,
+   "shot": 1.0,
+   "merged": 1.0
+  },
+  "1818057f": {
+   "bucket": "[0.85, 1]",
+   "confidence": 1.0,
+   "nvarc": 1.0,
+   "shot": 1.0,
+   "merged": 1.0
+  },
+  "7c66cb00": {
+   "bucket": "[0.85, 1]",
+   "confidence": 1.0,
+   "nvarc": 1.0,
+   "shot": 0.0,
+   "merged": 1.0
+  }
+ },
+ "reading": {
+  "fault": null,
+  "harness": {
+   "tasks": 5,
+   "shot_solved": 3,
+   "investigate": false
+  },
+  "extend": {
+   "net": 1.0,
+   "of": 6,
+   "expected_loss": 0.717,
+   "adjusted": 0.283,
+   "threshold": 1.0,
+   "decision": "keep (0, 0.5) then 0 (mid_bucket false)"
+  },
+  "forcing": {
+   "answered": 6,
+   "outputs": 7,
+   "rate": 0.857,
+   "threshold": 0.867,
+   "budget_forced": 4,
+   "separate_turns": 0,
+   "decision": "revert to the separate forcing turn"
+  },
+  "lenient": {
+   "score": 6.0,
+   "strict_score": 6.0
+  }
+ }
+}

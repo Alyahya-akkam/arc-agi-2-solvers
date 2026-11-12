@@ -1,0 +1,109 @@
+# Submission notebook build of the agent-only variant (task P6.5, ADR-020): the agent solver takes
+# the whole session (NVARC's share is 0), the candidate for an agent-heavy final pick. Equal to
+# configs/submission_P6.5-hybrid.yaml but for agent.nvarc_share_s, from the same builder path, so
+# the final picks (this or the hybrid, and Submission 2's pure NVARC build,
+# configs/submission_P2.6-01.yaml) come from one tested notebook. NVARC stays configured as the
+# fallback: when the agent check fails in a competition rerun (an input missing, the driver too
+# old), NVARC runs alone with its full deadlines, as Submission 2; when the agent stage ends 30
+# minutes or more before NVARC's soft deadline (a failed install or engine boot, a crash or a
+# kill, an engine gone for good), NVARC's stage runs then, with the deadlines it would have had,
+# and P6.2's selection keeps the agent's verified programs first. An agent that runs to its end
+# but verifies little leaves NVARC no time: that risk is docs/SUBMITTING.md's. Read by
+# scripts/build_submission.py and scripts/build_kaggle_notebook.py with yaml.safe_load; runbook
+# docs/runbooks/build_submission.md (hybrid build). No run of its own is briefed yet. Fit to
+# submit.
+
+# The one notebook submissions come from (docs/SUBMITTING.md).
+kaggle_notebook: alyahya737/arc26-submission
+
+# The P6.5 lineage's code dataset, shared with the hybrid's builds (one commit, one wheel).
+code_dataset: alyahya737/arc26-code-p65
+
+# Competition attached: it mounts the data, and only notebooks attached to it get 4xL4.
+competition: arc-prize-2026-arc-agi-2
+
+# 4xL4: the engine's tensor parallelism 4, and NVARC's four workers when it is the fallback.
+accelerator: NvidiaL4
+
+# Same pinned image and install notebook source as every build (ADR-010).
+reference_metadata: reference/kernel-metadata.json
+
+# Same install notebook version as every build (see configs/submission_P0.5-01.yaml).
+kernel_source_versions:
+  sorokin/pip-install-unsloth-flash-patch: 2
+
+# Same model folder name as every build (K0): NVARC's base model, for the fallback.
+model_slug: qwen3_4b_grids15_sft139
+
+# DEV120, as the hybrid's submission build, so a development run of this build compares with
+# P2.6-01.
+subset: null
+
+# One worker per L4 for NVARC's fallback (production: submission_blocker).
+workers: 4
+
+# The project's one fixed seed: NVARC's PYTHONHASHSEED; the agent's seed is its run config's.
+hash_seed: 0
+
+# NVARC runs only as the fallback (share 0 skips it when the agent stage follows).
+run_solver: true
+
+# NVARC's soft deadline as the fallback: the competition value (12 h minus 30 min).
+solver_end_s: 41400
+
+# NVARC's hard stop as the fallback: the competition value (12 h minus 20 min).
+solver_kill_s: 42000
+
+# The split solver (ADR-011), Submission 2's, for the fallback.
+solver: split
+
+# Submission 2's LoRA scope (ADR-018) for the fallback.
+scope:
+  # Rank 16, rsLoRA scale 8, as P2.6-01.
+  lora_r: 16
+  # q, k, v, o; embed_tokens and lm_head frozen, as P2.6-01.
+  lora_targets: [q_proj, k_proj, v_proj, o_proj]
+
+# The agent stage, as configs/submission_P6.5-hybrid.yaml but for the share.
+agent:
+  # On: the stage runs when the agent check passes.
+  enabled: true
+  # 0: NVARC does not run when the agent stage will follow; the agent starts minutes after the
+  # notebook (the design note's scenario S1, agent_library_design.md 5.5).
+  nvarc_share_s: 0
+  # The agent's session end, 12 h minus 20 min, as the hybrid: generation stops at 40,200 s.
+  end_s: 42000
+  # SIGTERM to SIGKILL, as the hybrid: the run stops its engine (up to 90 s) and writes once more.
+  term_s: 120
+  # The least time before the generation stop worth an install and a boot, as the hybrid.
+  min_stage_s: 1800
+  # The offline install's limit, the spike's, as the hybrid.
+  install_timeout_s: 1500
+  # The agent's run config (task P6.4), as the hybrid.
+  config: configs/agent_default.yaml
+  # The weights, as the hybrid.
+  model:
+    # The weights notebook (task P6.3).
+    notebook: alyahya737/arc26-dl-qwen38-int4
+    # Its first run's output.
+    version: 1
+    # The weights' folder in it.
+    folder: qwen38-27b-int4
+    # The verified revision its MANIFEST.json must name.
+    revision: 91bd022d5b49442a868bc35008f6c21e1860edfa
+  # The engine wheelhouse, as the hybrid.
+  wheels:
+    # The wheels notebook (task P6.3).
+    notebook: alyahya737/arc26-dl-agent-wheels
+    # Its first run's output.
+    version: 1
+    # The wheelhouse's folder in it.
+    folder: wheelhouse
+    # The vLLM version its MANIFEST.json must list.
+    vllm: 0.31.0
+  # The image's Python 3.11.13 makes the engine's venv, as the hybrid.
+  base_python: /usr/bin/python3.11
+  # Scratch under /tmp, as the hybrid.
+  scratch_dir: /tmp/arc26-agent
+  # CUDA 13.0's oldest driver, as the hybrid.
+  min_driver: 580.65.06

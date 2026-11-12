@@ -1,0 +1,83 @@
+# Script notebook build of run MT-02, the first session of H's meta-training at full scale (task
+# MT; BRIEF A7 week 3, A8, A9). Read by scripts/build_submission.py and
+# scripts/build_kaggle_notebook.py with yaml.safe_load; runbooks docs/runbooks/build_submission.md
+# (script mode) and docs/runbooks/train_hypernet.md; pre-run brief docs/prerun/MT-02.md, revision
+# 2: this session is capped at what the week's quota covers (--max-wall-s and script_kill_s
+# below; the training config is unchanged). configs/script_MT-03.yaml is this build without the
+# cap, with MT-02's output attached and --resume; configs/script_MT-04.yaml resumes MT-03's.
+
+# A script config (task P0.5d): the notebook runs one script, never the solver, and is never
+# submitted.
+kind: script
+
+# A new notebook of task MT, first pushed by this revision (revision 1 never ran). MT-03 runs in
+# another (Kaggle refuses a notebook's own output) and attaches this one's version 1 to resume
+# from its checkpoints.
+kaggle_notebook: alyahya737/arc26-mt-train-1
+
+# Meta-training's own private code dataset (configs/script_MT-01.yaml gives the reason). Version
+# 2 (revision 2): version 1's files (MT-01's, and this build's wheel and config) with this build's
+# train_hypernet.py, which reads --max-wall-s; MT-03 and MT-04 run on the same version.
+code_dataset: alyahya737/arc26-code-mt
+
+# Same competition as every build: the environment check expects the mount.
+competition: arc-prize-2026-arc-agi-2
+
+# 4xL4, one training process per GPU (train_hypernet_MT.yaml, gpus 4), the hardware P3.6-01
+# measured the step on. bf16 rules out T4; the bf16 stop refuses a substituted 2xT4.
+accelerator: NvidiaL4
+
+# Same pinned image and model as every build: the stack P3.5-01, P3.5-02, and P3.6-01 ran (torch
+# 2.8.0, transformers 4.55.4, flash_attn 2.8.2).
+reference_metadata: reference/kernel-metadata.json
+
+# Same install notebook version as every build (configs/submission_P0.5-01.yaml).
+kernel_source_versions:
+  sorokin/pip-install-unsloth-flash-patch: 2
+
+# Same model folder name as every build: the environment check finds the base by it.
+model_slug: qwen3_4b_grids15_sft139
+
+# P3.4's episodes and leakage report at the versions whose check passed (as MT-01 and the toy
+# runs), and MT-01's output, version 1, holding the embedding cache. A cache from another MT-01
+# session (a continuation notebook) means a new version of this config and an amended brief.
+notebook_inputs:
+  alyahya737/arc26-p3-4-episodes: 2
+  alyahya737/arc26-p3-4-leakage: 2
+  alyahya737/arc26-mt-cache: 1
+
+# The training script; it imports only arc26 (the wheel), the image's packages, and the standard
+# library.
+script: scripts/train_hypernet.py
+
+# Its config: 5,600 steps over two sessions, source weights, 8 views, validation every 200 steps,
+# best.pt, each value with its reason.
+script_config: configs/train_hypernet_MT.yaml
+
+# The commit for run.json, the two P3.4 mounts as the roots the script searches, and MT-01's cache
+# inside its mount, so H's z_bar comes from the cache and nothing is encoded before step 0. Last,
+# this session's budget (revision 2, 4 Oct): the week's quota page showed 7.87 h left, lost at the
+# reset on 10 Oct, and 4xL4 may cost twice the T4 rate, so the session's worst case (its Timeout,
+# 13,600 s) must cost at most about 7.6 quota h at 2x. The script checkpoints and stops itself
+# (exit 3) when its next step could cross 12,600 s of its own clock instead of the config's
+# 41,400 s; the budget is not a resume setting, so MT-03 resumes this checkpoint under the
+# config's own budget, and train_hypernet_MT.yaml stays byte-identical.
+args:
+  - --commit
+  - "{commit}"
+  - --episodes-root
+  - "{input:alyahya737/arc26-p3-4-episodes}"
+  - --check-root
+  - "{input:alyahya737/arc26-p3-4-leakage}"
+  - --embedding-cache
+  - "{input:alyahya737/arc26-mt-cache}/embedding_cache"
+  - --max-wall-s
+  - "12600"
+
+# Seconds after the notebook's start: the hard stop. The script starts 213 s in (MT-01's
+# environment check and install, measured), so its budget ends about 12,813 s in; the stop then
+# takes at most one step past the mean (150 s at worst, the step kill), a checkpoint (about 10 s),
+# and the summary and curves (under 30 s). 13,300 s leaves 487 s for that, about 2.5 times the
+# worst case. The brief's Timeout is this plus 300 s (the notebook's logs, 6 s in MT-01, and about
+# 62 s of the session outside the notebook), 13,600 s: 7.56 quota h at 2x, 3.78 at 1x.
+script_kill_s: 13300

@@ -1,0 +1,19 @@
+# Settings of scripts/repack_output.py for the weights notebook's output (task X2, X2-01
+# attempt 5). Flat key: value lines: the script reads them itself, with the image's Python and no
+# PyYAML. Runbook docs/runbooks/repack_output.md.
+
+# No source line: alyahya737/arc26-dl-qwen38-int4 version 1 is attached as a notebook input,
+# whose mount the session finds by search, so the build passes the folder as --source
+# (configs/X2-repack-weights-script.yaml, args).
+
+# In /kaggle/working, so the session's output keeps it: parts/ and MANIFEST.json. About 19.5 GB,
+# as the weights notebook's own output (19.47 GB of repository files) was.
+out: /kaggle/working/repack
+
+# 1 GiB per part, as the install output's (configs/repack_kaggle_lib.yaml): X2-01 attempt 5
+# fetched those 9 parts and checked their tree, while Kaggle cut the 18.6 GB single file at most
+# 6.9 GB in on each of 7 tries, every try from byte 0 (no Range).
+part_bytes: 1073741824
+
+# The parts' stem: parts/qwen38_int4.tar.000, .001, ...
+name: qwen38_int4

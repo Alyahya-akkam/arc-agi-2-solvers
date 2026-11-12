@@ -1,0 +1,60 @@
+# Script notebook build of run P3.6-01, the throughput and memory test of H's meta-training step
+# (task P3.6; BRIEF A8, A9). Read by scripts/build_submission.py and scripts/build_kaggle_notebook.py
+# with yaml.safe_load; runbooks docs/runbooks/build_submission.md (script mode) and
+# docs/runbooks/train_throughput.md; pre-run brief docs/prerun/P3.6-01.md. Modeled on
+# configs/script_P3.5-02.yaml: the same stack and accelerator, its own notebook, script, config, and
+# hard stop, and no attached notebook outputs (the episodes are synthetic).
+
+# A script config (task P0.5d): the notebook runs one script, never the solver, and is never
+# submitted.
+kind: script
+
+# Its own notebook, <owner>/<slug>, named in the pre-run brief; no CPU push may use it. Each slug
+# belongs to one task branch (docs/prerun/README.md).
+kaggle_notebook: alyahya737/arc26-p3-6-throughput
+
+# The same private code dataset as every build (ADR-010). The wheel is the base's (arc26/
+# untouched since a00a452), so one dataset version can hold it with this build's
+# train_throughput.py and its config beside other builds of the same wheel (P2.1-02's): each
+# notebook takes its own two files by name beside the wheel and checks their sha256.
+code_dataset: alyahya737/arc26-code
+
+# Same competition as the other builds. The run reads none of its files; the environment check
+# expects the mount, as in every build.
+competition: arc-prize-2026-arc-agi-2
+
+# 4xL4, the accelerator of the long run this prices and of P3.5-01, whose step the run repeats on
+# 4 processes, one per GPU. bf16 rules out T4, and NvidiaL4X1 ran on 2xT4 when requested (P0.3-01);
+# the bf16 stop refuses such a session. No fallback: the measurement is of 4xL4.
+accelerator: NvidiaL4
+
+# Same pinned image and model as the other builds: the stack P1.1-01 and P3.5-01 ran (torch 2.8.0,
+# transformers 4.55.4, flash_attn 2.8.2).
+reference_metadata: reference/kernel-metadata.json
+
+# Same install notebook version as the other builds (configs/submission_P0.5-01.yaml).
+kernel_source_versions:
+  sorokin/pip-install-unsloth-flash-patch: 2
+
+# Same model folder name as the other builds: the environment check finds the base by it, and the
+# script by the end of its handle (configs/train_throughput.yaml, input_root).
+model_slug: qwen3_4b_grids15_sft139
+
+# The throughput script; it imports only arc26 (the wheel), the image's packages, and the standard
+# library, and finds the model under /kaggle/input by search.
+script: scripts/train_throughput.py
+
+# Its config, each value with its reason.
+script_config: configs/train_throughput.yaml
+
+# The commit for run.json (the dataset copy has no git checkout). Nothing else: the script finds
+# the model itself and needs no attached output.
+args:
+  - --commit
+  - "{commit}"
+
+# Seconds after the notebook's start: the hard stop. The script stops itself first, at its budget
+# max_wall_s 2400 s, about 3.4 times the 710 s it is expected to take (brief section 6); the 600 s
+# between, as in P3.5-01 and P3.5-02, cover the environment check and the install (55 s in
+# P3.5-01) and the script's last summary. The brief's Timeout is this plus 300 s, 3300 s.
+script_kill_s: 3000

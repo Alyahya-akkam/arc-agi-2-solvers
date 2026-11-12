@@ -1,0 +1,545 @@
+{
+ "attempt": 1,
+ "budget": {
+  "classes": {
+   "rank 2 right": [
+    23,
+    26
+   ],
+   "ranks 3 to 8 right": [
+    14,
+    15
+   ]
+  },
+  "finished": 37,
+  "forced": 11,
+  "not_finished": {
+   "not started": 4
+  },
+  "outputs": 41,
+  "own": 26,
+  "think_tokens": {
+   "max": 65536,
+   "median": 54513.0,
+   "min": 11978
+  }
+ },
+ "ceiling": {
+  "config": {
+   "[0.5, 0.7)": [
+    3.5,
+    3.0
+   ],
+   "all": [
+    9.33,
+    20.33
+   ]
+  },
+  "local": {
+   "[0.5, 0.7)": [
+    3.5,
+    3.0
+   ],
+   "all": [
+    9.33,
+    20.33
+   ]
+  }
+ },
+ "counts": {
+  "(0, 0.5)": 26,
+  "0": 6,
+  "[0.5, 0.7)": 55,
+  "[0.7, 0.9)": 52,
+  "[0.9, 1]": 109,
+  "all": 248
+ },
+ "decision": "No build: (2) judge, then the long shot at +0.08 tasks of 240 against P4.7b alone at +1.91, under the 1.0-task margin; P4.7b stays (the judge's change on the 37 finished outputs +0.83 tasks)",
+ "engine": {
+  "boot_up": true,
+  "degenerate": 0,
+  "judged": 37,
+  "nan_lines": 0,
+  "nan_source": "engine_log_counts.json (or step.json's engine_log)",
+  "replies": 37
+ },
+ "faults": [],
+ "judgments": 41,
+ "nvarc_run": "P6.9-02",
+ "outputs": 41,
+ "plan_problems": [],
+ "q_find": 0.3571,
+ "q_keep": 0.7826,
+ "run": "P4.8-04",
+ "speed": {
+  "forced": 11,
+  "judged": 37,
+  "per_hour": 15.96,
+  "ranker_seconds": null,
+  "seconds_median": 2964.213,
+  "seconds_per_judgment": 225.6,
+  "streams": 15,
+  "think_tokens_median": 54513.0,
+  "wall_s": 8348.0
+ },
+ "statuses": {
+  "label": 37,
+  "not started": 4
+ },
+ "tables": {
+  "debiased": {
+   "all": {
+    "clusters": 0,
+    "delta_tasks": 0,
+    "hits": 0,
+    "interval": null,
+    "interval_clustered": null,
+    "n": 0,
+    "override_hits": 0,
+    "overrides": 0,
+    "q": null
+   },
+   "bands": {
+    "[0.5, 0.7)": {
+     "clusters": 0,
+     "delta_tasks": 0,
+     "hits": 0,
+     "interval": null,
+     "interval_clustered": null,
+     "n": 0,
+     "override_hits": 0,
+     "overrides": 0,
+     "q": null
+    },
+    "[0.7, 0.9)": {
+     "clusters": 0,
+     "delta_tasks": 0,
+     "hits": 0,
+     "interval": null,
+     "interval_clustered": null,
+     "n": 0,
+     "override_hits": 0,
+     "overrides": 0,
+     "q": null
+    },
+    "[0.9, 1]": {
+     "clusters": 0,
+     "delta_tasks": 0,
+     "hits": 0,
+     "interval": null,
+     "interval_clustered": null,
+     "n": 0,
+     "override_hits": 0,
+     "overrides": 0,
+     "q": null
+    }
+   },
+   "classes": {
+    "rank 2 kept": {
+     "clusters": 0,
+     "delta_tasks": 0,
+     "hits": 0,
+     "interval": null,
+     "interval_clustered": null,
+     "n": 0,
+     "override_hits": 0,
+     "overrides": 0,
+     "q": null
+    },
+    "ranks 3 to 8 found": {
+     "clusters": 0,
+     "delta_tasks": 0,
+     "hits": 0,
+     "interval": null,
+     "interval_clustered": null,
+     "n": 0,
+     "override_hits": 0,
+     "overrides": 0,
+     "q": null
+    }
+   }
+  },
+  "judge": {
+   "all": {
+    "clusters": 22,
+    "delta_tasks": 0.8333,
+    "hits": 23,
+    "interval": [
+     0.4865,
+     0.7402
+    ],
+    "interval_clustered": [
+     0.4473,
+     0.7693
+    ],
+    "n": 37,
+    "override_hits": 5,
+    "overrides": 15,
+    "q": 0.6216
+   },
+   "bands": {
+    "[0.5, 0.7)": {
+     "clusters": 7,
+     "delta_tasks": -0.5,
+     "hits": 3,
+     "interval": [
+      0.1269,
+      0.5583
+     ],
+     "interval_clustered": [
+      0.1075,
+      0.604
+     ],
+     "n": 10,
+     "override_hits": 1,
+     "overrides": 6,
+     "q": 0.3
+    },
+    "[0.7, 0.9)": {
+     "clusters": 9,
+     "delta_tasks": 1.3333,
+     "hits": 9,
+     "interval": [
+      0.6523,
+      0.9774
+     ],
+     "interval_clustered": [
+      0.6362,
+      0.9789
+     ],
+     "n": 10,
+     "override_hits": 2,
+     "overrides": 3,
+     "q": 0.9
+    },
+    "[0.9, 1]": {
+     "clusters": 12,
+     "delta_tasks": 0.0,
+     "hits": 11,
+     "interval": [
+      0.4486,
+      0.8051
+     ],
+     "interval_clustered": [
+      0.4132,
+      0.8268
+     ],
+     "n": 17,
+     "override_hits": 2,
+     "overrides": 6,
+     "q": 0.6471
+    }
+   },
+   "classes": {
+    "rank 2 kept": {
+     "clusters": 15,
+     "delta_tasks": -2.5,
+     "hits": 18,
+     "interval": [
+      0.6158,
+      0.8899
+     ],
+     "interval_clustered": [
+      0.5725,
+      0.9063
+     ],
+     "n": 23,
+     "override_hits": 0,
+     "overrides": 5,
+     "q": 0.7826
+    },
+    "ranks 3 to 8 found": {
+     "clusters": 8,
+     "delta_tasks": 3.3333,
+     "hits": 5,
+     "interval": [
+      0.1861,
+      0.5745
+     ],
+     "interval_clustered": [
+      0.1497,
+      0.6368
+     ],
+     "n": 14,
+     "override_hits": 5,
+     "overrides": 10,
+     "q": 0.3571
+    }
+   }
+  },
+  "rank2": {
+   "all": {
+    "clusters": 22,
+    "delta_tasks": 0.0,
+    "hits": 23,
+    "interval": [
+     0.4865,
+     0.7402
+    ],
+    "interval_clustered": [
+     0.4473,
+     0.7693
+    ],
+    "n": 37,
+    "override_hits": 0,
+    "overrides": 0,
+    "q": 0.6216
+   },
+   "bands": {
+    "[0.5, 0.7)": {
+     "clusters": 7,
+     "delta_tasks": 0.0,
+     "hits": 5,
+     "interval": [
+      0.2693,
+      0.7307
+     ],
+     "interval_clustered": [
+      0.236,
+      0.764
+     ],
+     "n": 10,
+     "override_hits": 0,
+     "overrides": 0,
+     "q": 0.5
+    },
+    "[0.7, 0.9)": {
+     "clusters": 9,
+     "delta_tasks": 0.0,
+     "hits": 7,
+     "interval": [
+      0.4417,
+      0.8731
+     ],
+     "interval_clustered": [
+      0.4287,
+      0.8789
+     ],
+     "n": 10,
+     "override_hits": 0,
+     "overrides": 0,
+     "q": 0.7
+    },
+    "[0.9, 1]": {
+     "clusters": 12,
+     "delta_tasks": 0.0,
+     "hits": 11,
+     "interval": [
+      0.4486,
+      0.8051
+     ],
+     "interval_clustered": [
+      0.4132,
+      0.8268
+     ],
+     "n": 17,
+     "override_hits": 0,
+     "overrides": 0,
+     "q": 0.6471
+    }
+   },
+   "classes": {
+    "rank 2 kept": {
+     "clusters": 15,
+     "delta_tasks": 0.0,
+     "hits": 23,
+     "interval": [
+      0.8947,
+      1.0
+     ],
+     "interval_clustered": [
+      0.8472,
+      1.0
+     ],
+     "n": 23,
+     "override_hits": 0,
+     "overrides": 0,
+     "q": 1.0
+    },
+    "ranks 3 to 8 found": {
+     "clusters": 8,
+     "delta_tasks": 0.0,
+     "hits": 0,
+     "interval": [
+      0.0,
+      0.162
+     ],
+     "interval_clustered": [
+      0.0,
+      0.2527
+     ],
+     "n": 14,
+     "override_hits": 0,
+     "overrides": 0,
+     "q": 0.0
+    }
+   }
+  },
+  "raw": {
+   "all": {
+    "clusters": 0,
+    "delta_tasks": 0,
+    "hits": 0,
+    "interval": null,
+    "interval_clustered": null,
+    "n": 0,
+    "override_hits": 0,
+    "overrides": 0,
+    "q": null
+   },
+   "bands": {
+    "[0.5, 0.7)": {
+     "clusters": 0,
+     "delta_tasks": 0,
+     "hits": 0,
+     "interval": null,
+     "interval_clustered": null,
+     "n": 0,
+     "override_hits": 0,
+     "overrides": 0,
+     "q": null
+    },
+    "[0.7, 0.9)": {
+     "clusters": 0,
+     "delta_tasks": 0,
+     "hits": 0,
+     "interval": null,
+     "interval_clustered": null,
+     "n": 0,
+     "override_hits": 0,
+     "overrides": 0,
+     "q": null
+    },
+    "[0.9, 1]": {
+     "clusters": 0,
+     "delta_tasks": 0,
+     "hits": 0,
+     "interval": null,
+     "interval_clustered": null,
+     "n": 0,
+     "override_hits": 0,
+     "overrides": 0,
+     "q": null
+    }
+   },
+   "classes": {
+    "rank 2 kept": {
+     "clusters": 0,
+     "delta_tasks": 0,
+     "hits": 0,
+     "interval": null,
+     "interval_clustered": null,
+     "n": 0,
+     "override_hits": 0,
+     "overrides": 0,
+     "q": null
+    },
+    "ranks 3 to 8 found": {
+     "clusters": 0,
+     "delta_tasks": 0,
+     "hits": 0,
+     "interval": null,
+     "interval_clustered": null,
+     "n": 0,
+     "override_hits": 0,
+     "overrides": 0,
+     "q": null
+    }
+   }
+  }
+ },
+ "variants": {
+  "at_bars": {
+   "0.69": {
+    "(1) rerank only": {
+     "judge_s": 9374,
+     "judged_share": 0.168,
+     "tail_s": 0,
+     "tasks": -3.28
+    },
+    "(2) judge, then the long shot": {
+     "judge_s": 3014,
+     "judged_share": 0.243,
+     "tail_s": 0,
+     "tasks": 0.29
+    },
+    "P4.7b alone": {
+     "tail_s": 3014,
+     "tasks": 1.91
+    }
+   },
+   "0.83": {
+    "(1) rerank only": {
+     "judge_s": 9374,
+     "judged_share": 0.168,
+     "tail_s": 0,
+     "tasks": -2.58
+    },
+    "(2) judge, then the long shot": {
+     "judge_s": 3014,
+     "judged_share": 0.243,
+     "tail_s": 0,
+     "tasks": 0.51
+    },
+    "P4.7b alone": {
+     "tail_s": 3014,
+     "tasks": 1.91
+    }
+   },
+   "0.85": {
+    "(1) rerank only": {
+     "judge_s": 9374,
+     "judged_share": 0.168,
+     "tail_s": 0,
+     "tasks": -2.48
+    },
+    "(2) judge, then the long shot": {
+     "judge_s": 3014,
+     "judged_share": 0.243,
+     "tail_s": 0,
+     "tasks": 0.54
+    },
+    "P4.7b alone": {
+     "tail_s": 3014,
+     "tasks": 1.91
+    }
+   },
+   "0.9": {
+    "(1) rerank only": {
+     "judge_s": 9374,
+     "judged_share": 0.168,
+     "tail_s": 0,
+     "tasks": -2.23
+    },
+    "(2) judge, then the long shot": {
+     "judge_s": 3014,
+     "judged_share": 0.243,
+     "tail_s": 0,
+     "tasks": 0.62
+    },
+    "P4.7b alone": {
+     "tail_s": 3014,
+     "tasks": 1.91
+    }
+   }
+  },
+  "measured": {
+   "(1) rerank only": {
+    "judge_s": 9374,
+    "judged_share": 0.168,
+    "tail_s": 0,
+    "tasks": -3.48
+   },
+   "(2) judge, then the long shot": {
+    "judge_s": 3014,
+    "judged_share": 0.243,
+    "tail_s": 0,
+    "tasks": 0.08
+   },
+   "P4.7b alone": {
+    "tail_s": 3014,
+    "tasks": 1.91
+   }
+  }
+ }
+}

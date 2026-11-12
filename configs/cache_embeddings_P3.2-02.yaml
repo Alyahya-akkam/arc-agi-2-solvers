@@ -1,0 +1,132 @@
+# Pair-encoder throughput at 8 views, run P3.2-02, the cost cut P3.2-01's Bad row pre-registered
+# (task P3.2; BRIEF B2 Q1, B5 P3.2, A8). Read by scripts/cache_embeddings.py with yaml.safe_load:
+# every key below is required and no other key is accepted. Pre-run brief:
+# docs/prerun/P3.2-02.md. Runbook: docs/runbooks/cache_embeddings.md. On Kaggle the script
+# notebook configs/script_P3.2-02.yaml runs it. It differs from configs/cache_embeddings.yaml
+# (P3.2-01) only in run_id, n_perm, reference_n_perm, and the smoke run's names and folders; each
+# other value keeps P3.2-01's reason, restated here.
+
+# Run id of the pre-run brief this config serves; run.json and summary.md carry it.
+run_id: P3.2-02
+
+# The weights and their precision, named once: this Kaggle Models handle (K0) is part of the cache
+# key, so new weights or another precision get a new cache namespace, and it names the folder the
+# script loads (model_dir below), so the cache key always names the weights that were loaded.
+model_id: sorokin/qwen3_4b_grids15_sft139/Transformers/bfloat16/1
+
+# Root searched for the model folder and the challenges file: Kaggle mounts every attached input
+# under it, and the mounts below it differ between 2025 and 2026 and moved within 2026
+# (docs/STATE.md, rules for scripts). P3.2-01 found both at K0's paths this way.
+input_root: /kaggle/input
+
+# Base model folder; null finds it under input_root as the one folder that holds config.json and
+# whose path ends with model_id's model, framework, variation, and version, case ignored.
+model_dir: null
+
+# ARC challenges JSON, searched: the one file under input_root whose path ends with the
+# competition's folder and this file name. Only the demonstration ("train") pairs are read, and
+# the script refuses a file whose name contains "solution" (BRIEF A0).
+challenges: arc-prize-2026-arc-agi-2/arc-agi_evaluation_challenges.json
+
+# Tasks processed: DEV40 from arc26.data in the installed wheel, its one definition, so this run
+# measures the 40 tasks P3.2-01 measured.
+subset: DEV40
+
+# One L4 of the 4xL4 machine: the acceptance is a one-L4 time (B5 P3.2), and each of the scored
+# rerun's four workers owns one L4. The script refuses to start when CUDA is requested but absent.
+device: cuda:0
+
+# bf16, the Kaggle model variant and the notebook's runtime precision, as in P3.2-01.
+dtype: bfloat16
+
+# SDPA, as in P3.2-01: its time was linear in tokens (R^2 0.974, flat per-token cost from 800 to
+# 1,866 tokens per view), so FlashAttention 2 has no attention term to remove
+# (docs/experiments/P3.2-01.md); only the view count changes.
+attn_implementation: sdpa
+
+# L, the decoder layers run: 24 of 36 (BRIEF B2 Q1, ADR-001), unchanged so the cut is views only.
+layer: 24
+
+# Pooled positions: the output-grid tokens (Q1).
+pool: output
+
+# The cut: one color permutation per dihedral transform, 8 views instead of 16, so each task's
+# tokens and P3.2-01's linear time halve (P3.2-01's Bad row; runbook section 6, item 4).
+n_perm: 1
+
+# The decode path's augment seed, as in P3.2-01. view_descriptors draws round by round, so with
+# this seed the 8 views are the first 8 of P3.2-01's 16, which the decode path itself uses: the
+# diagnostic below needs only the other 8, and P3.2-01's cached per-view rows give these 8 views'
+# embeddings without a GPU. Another seed would draw 8 views outside the 16.
+view_seed: 2
+
+# The view diagnostic: each pair's embedding under these 8 views against its embedding under
+# P3.2-01's 16 (n_perm 2, the same seed), by encoding only the other 8 views after the cache
+# phase. It decides nothing; it shows the human how much z_bar moves.
+reference_n_perm: 2
+
+# Padded tokens per prefill batch, as in P3.2-01 (peak 8.72 GB allocated of an L4's 22 GB there).
+batch_tokens: 16384
+
+# Also store the 8 per-view embeddings: 81,920 bytes per pair in fp32 beside 10,240 for the mean,
+# about 10.8 MB for DEV40, so P3.7 can ablate views from the cache without a GPU.
+store_views: true
+
+# Encoded pairs held in memory between cache writes; a killed session loses at most these.
+flush_pairs: 256
+
+# k, the demonstration pairs per throughput measurement: B5 P3.2's k = 4. Tasks with fewer pairs
+# repeat theirs (32 of DEV40's 40 tasks have 2 or 3, K0).
+throughput_k: 4
+
+# Every task measured, as in P3.2-01, so the two runs compare task by task.
+throughput_tasks: null
+
+# The acceptance bound in seconds (B5 P3.2). summary.md counts the tasks above it; the brief's
+# decision rule acts on the count, the script does not.
+acceptance_s: 10.0
+
+# Wall-time kill criterion in seconds from the script's start, model load included: the script
+# stops between tasks, saves its cache and logs, and exits 3. P3.2-01's script took 598 s at 16
+# views; this run's estimate is about 480 s with the diagnostic (brief, section 6), so 1800 s is
+# over 3 times it. The notebook's hard stop (script_kill_s 2400 s in configs/script_P3.2-02.yaml)
+# and the brief's Timeout sit above it, so this stop, which writes the logs, comes first.
+max_wall_s: 1800
+
+# Cache root; the namespace directory inside it is named by the encoder settings, the 8-view set
+# included, so it never mixes with a 16-view cache. It stays on Kaggle as notebook output.
+cache_dir: /kaggle/working/embedding_cache
+
+# Run logs: kaggle_ops.py pull brings /kaggle/working/run_logs back to runs/<run_id>/.
+out_dir: /kaggle/working/run_logs
+
+# --smoke runs the same settings on CPU with a tiny random Qwen3, a stand-in tokenizer, and
+# synthetic tasks, all built in the script (BRIEF A8), the 8 views and the diagnostic included:
+# no input is searched. These keys replace the ones above.
+smoke:
+  # Keeps smoke outputs apart from the GPU run's and from P3.2-01's smoke.
+  run_id: P3.2-02-smoke
+  # The random stand-in weights get their own cache namespace.
+  model_id: smoke/tiny-random-qwen3
+  # Every synthetic task: DEV40's ids are not in the smoke file.
+  subset: null
+  # BRIEF A0: no local GPU work.
+  device: cpu
+  # fp32: CPU bf16 matmuls are slow, and the smoke checks logic, not precision.
+  dtype: float32
+  # The task brief's tiny Qwen3 uses eager attention.
+  attn_implementation: eager
+  # 2 of the tiny model's 4 layers: mid-stack, as 24 of 36 is.
+  layer: 2
+  # Small batches, so the 30 by 30 pair forces several prefill batches.
+  batch_tokens: 4096
+  # Generous for CPU; the smoke takes seconds.
+  max_wall_s: 600
+  # The smoke cache, under runs/, which git ignores.
+  cache_dir: runs/P3.2-02-smoke/embedding_cache
+  # The smoke logs, also under runs/.
+  out_dir: runs/P3.2-02-smoke
+  # Synthetic tasks with 2, 3, and 4 pairs; the last has a 30 by 30 pair, the longest sequence.
+  tasks: 3
+  # Seed of the synthetic grids and of the tiny model's weights.
+  seed: 0

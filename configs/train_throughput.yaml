@@ -1,0 +1,274 @@
+# Throughput and memory of one meta-training step of H, run P3.6-01 (task P3.6; BRIEF B5 P3.6, B3,
+# B8, A8). Read by scripts/train_throughput.py with yaml.safe_load: every key below is required and
+# no other key is accepted; the smoke section may override any of them (mappings merge key by key,
+# lists are replaced). Pre-run brief: docs/prerun/P3.6-01.md. Runbook:
+# docs/runbooks/train_throughput.md. No input path is hardcoded: the base model is found under
+# input_root by the end of its Kaggle Models handle. "P3.5-01" below means that run's pulled logs
+# (runs/P3.5-01/run_logs/, the brief's sources); "P3.4 stats" is P3.4 build 2's
+# episodes_stats.md (docs/experiments/P3.4.md).
+
+# Run id of the pre-run brief this config serves; run.json and summary.md carry it.
+run_id: P3.6-01
+
+# Every Kaggle input is mounted under this folder, and the mounts below it moved within 2026
+# (docs/STATE.md), so the script finds the model by search, as the notebook's environment check
+# and scripts/cache_embeddings.py do, instead of reading a fixed path.
+input_root: /kaggle/input
+
+# Base model folder (config.json, weights, tokenizer); null finds it under input_root as the one
+# folder holding config.json whose path ends with train.model_id's model, framework, variation, and
+# version (qwen3_4b_grids15_sft139/transformers/bfloat16/1, under models/sorokin/ in 2026, K0).
+model_dir: null
+
+# Run logs: kaggle_ops.py pull brings /kaggle/working/run_logs back to runs/P3.6-01/.
+out_dir: /kaggle/working/run_logs
+
+# The training step this run times: configs/train_hypernet.yaml's settings (the long run's, whose
+# cost P0.4 prices; the toy runs P3.5-01 and P3.5-02 share every one of them), copied because a
+# script notebook ships one config (P0.5d script mode). Only max_tokens differs;
+# tests/test_train_throughput.py checks that. The script adds what a session sets itself (gpus and
+# accum per point, the run id and folders) and TrainConfig's keys that no part of a step reads
+# (the episode build, the encoder, validation, checkpoints, the loop's budget).
+train:
+  # The weights and their precision (the Kaggle model handle, K0); the model search reads its end.
+  model_id: sorokin/qwen3_4b_grids15_sft139/Transformers/bfloat16/1
+  # One GPU per process (NvidiaL4; T4 has no bf16).
+  device: cuda
+  # The frozen base in the Kaggle bf16 variant (B5 P3.5); H and the injected delta stay fp32.
+  dtype: bfloat16
+  # FlashAttention 2 when flash_attn imports on a bf16 GPU, else SDPA (B5 P3.5); P3.5-01 loaded
+  # FlashAttention 2 (run.json), and every result records the kernel used.
+  attn_implementation: auto
+  # Non-reentrant activation checkpointing per decoder layer (B5 P3.5; research note risks 2, 3):
+  # the memory this run measures at long episodes is the checkpointed step's.
+  gradient_checkpointing: true
+  # Not a cap here: build_sequence asserts it, so it is the longest point's length (9728); the long
+  # run's cap is decision.cap_tokens (8192, configs/train_hypernet.yaml).
+  max_tokens: 9728
+  # The loss covers the query's grid and the <|im_end|> that closes it (ADR-006 amendment).
+  loss_includes_eos: true
+  # H, equal to configs/hypernet.yaml (P3.3): 134,958,208 parameters, the gradient and the AdamW
+  # moments this step carries. Reasons there.
+  hypernet:
+    # The base's hidden size, the width of z_bar.
+    embed_dim: 2560
+    # T2L's larger trunk width.
+    latent: 512
+    # Head input width under B5 P3.3's 150M budget.
+    head_in: 384
+    # T2L's trunk dropout, active in training mode, as in the training step.
+    dropout: 0.05
+    # Rank 16 on q, k, v, o (Q2, G2): 11,796,480 emitted values per adapter.
+    rank: 16
+    # The notebook's alpha; rsLoRA scale 8.
+    alpha: 32
+    # Q2's scope (ADR-002).
+    target_modules: [q_proj, k_proj, v_proj, o_proj]
+    # One fixed seed (CLAUDE.md).
+    seed: 0
+  # The long run's schedule; the timed steps run inside its warmup, whose learning rate changes
+  # no cost.
+  steps: 3000
+  # D2L's peak learning rate (research note 1.4), as every P3.5 run.
+  lr: 4.0e-5
+  # D2L's minimum learning rate (research note 1.4).
+  min_lr: 1.0e-7
+  # D2L's 100 warmup steps (research note 1.4).
+  warmup_steps: 100
+  # AdamW decay on 2-D weights (research note 1.4); the optimizer's work per step is timed.
+  weight_decay: 0.01
+  # AdamW betas, D2L's and torch's defaults.
+  betas: [0.9, 0.999]
+  # AdamW epsilon, D2L's and torch's default.
+  eps: 1.0e-8
+  # D2L's and T2L's gradient-norm clip (research note 1.4, 2); clipping is part of the step.
+  clip: 1.0
+  # No factor penalty (P3.5 task brief: optional, off by default).
+  penalty: none
+  # Zero, since the penalty is off.
+  penalty_weight: 0.0
+  # Q6's KL term is off and not implemented (BRIEF A7 cut order, item 4).
+  kl_weight: 0.0
+  # The per-process seeds of the training run (CLAUDE.md: one fixed seed).
+  seed: 0
+
+# The measurements, in run order. Consecutive points with the same gpus share one session: one set
+# of processes and one model load. A point that fails (out of memory, an error) ends its session,
+# and the session's later points run in a new one. Lengths are in units of k = 1024 tokens, the
+# bins of P3.4's histogram: 2k, 5k, 8k (the cap), and 9.5k are B5's and the task brief's lengths.
+points:
+  # 512 and 1024 tokens on 4 GPUs: the short end, where 52% of the training episodes lie (51,762 of
+  # 99,674 below 1024, P3.4 stats) and where P3.5-01's steps grew from 0.65 s (longest episode near
+  # 430 tokens) to 0.93 s (near 920); the projection needs the cost there.
+  - {name: ddp-512, kind: fixed, gpus: 4, accum: 1, tokens: 512}
+  - {name: ddp-1024, kind: fixed, gpus: 4, accum: 1, tokens: 1024}
+  # 2k and 5k, B5 P3.6's lengths, one episode per GPU per step as P3.5-01 trained.
+  - {name: ddp-2048, kind: fixed, gpus: 4, accum: 1, tokens: 2048}
+  - {name: ddp-5120, kind: fixed, gpus: 4, accum: 1, tokens: 5120}
+  # The long run's own step: accumulation 8 on 4 GPUs (configs/train_hypernet.yaml), 32 episodes of
+  # lengths drawn from P3.4's training histogram; it calibrates the projection. One untimed step,
+  # since each step holds 8 episodes per GPU; 6 timed; the point takes about 100 s (estimate, brief
+  # section 6). It runs before the long points, and no point empties the allocator's cache (P3.5's
+  # training loop never does), so the long points meet an allocator that has seen mixed lengths, as
+  # in a long run.
+  - {name: mix-accum8, kind: mix, gpus: 4, accum: 8, warm_steps: 1, timed_steps: 6}
+  # 8192, the training cap (P3.4 dropped the 17 longer episodes): the decision rule's point.
+  - {name: ddp-8192, kind: fixed, gpus: 4, accum: 1, tokens: 8192}
+  # 9728 = 9.5k: B5's 9.5k worst case (B3: four demonstrations and a query of 30 by 30 grids, 9330
+  # tokens, fit below it), above the cap: whether a longer cap could fit later.
+  - {name: ddp-9728, kind: fixed, gpus: 4, accum: 1, tokens: 9728}
+  # One process, no DDP: at 512, DDP's cost per synchronized step (the all-reduce of H's 135M fp32
+  # gradients) against ddp-512, which the projection subtracts from 7 of the 8 micro steps; at
+  # 8192, the task brief's single-process memory and step (no DDP buckets), for a one-GPU machine.
+  - {name: single-512, kind: fixed, gpus: 1, accum: 1, tokens: 512}
+  - {name: single-8192, kind: fixed, gpus: 1, accum: 1, tokens: 8192}
+  # H's forward for all 36 layers and 4 modules on one L4, B5 P3.3's acceptance (under 50 ms): 5
+  # untimed and 50 timed calls in each mode, evaluation without autograd (test time) and training.
+  - {name: h-forward, kind: hypernet, gpus: 1, warm_steps: 5, timed_steps: 50}
+
+# Untimed steps first in each point: the first steps carry one-time costs (cuBLAS and kernel setup,
+# AdamW's state at the first update, DDP's bucket rebuild after its first step, the allocator's
+# growth at a new length). Two, as P3.5-01's first steps ran 3.1 to 4.3 s against a 2.3 s mean.
+warm_steps: 2
+
+# Timed steps per point, whose median is the point's step time: P3.5-01's steps at one length
+# spread a few percent, so six give a stable median for minutes of GPU time at 9.5k.
+timed_steps: 6
+
+# The run the projection prices for P0.4 and the week it is priced against.
+projection:
+  # P3.4's training split by 1024-token bins: bin i holds lengths [1024 i, 1024 (i + 1)) in the
+  # longer orientation (P3.4 stats, train, all sources).
+  bin_tokens: 1024
+  # Episodes per bin (P3.4 stats); they sum to 99,674.
+  counts: [51762, 26389, 12586, 5775, 2181, 690, 188, 103]
+  # The split's measured mean (P3.4 stats), beside the draw's 1368 (uniform in each bin): the draw
+  # runs 1.5% long, which errs toward a slower step.
+  mean_tokens: 1348.4
+  # Training episodes in one pass of the long run (P3.4 stats).
+  episodes: 99674
+  # The long run's 4 processes on 4xL4 (configs/train_hypernet.yaml).
+  gpus: 4
+  # Its accumulation 8 (B5 P3.5; D2L's 8): 32 episodes per optimizer step.
+  accum: 8
+  # Steps drawn for the expected step time: the mean's standard error is then about 0.1% of it.
+  samples: 20000
+  # One fixed seed (CLAUDE.md).
+  seed: 0
+  # Weekly quota hours tabulated for P0.4: a third, two thirds, and all of Kaggle's about 30 h (B3,
+  # unverified), and 45 h with Colab Pro's 15 h (docs/STATE.md, 2 Oct).
+  quota_hours: [10, 20, 30, 45]
+  # Quota hours charged per hour of a 4xL4 session, both readings: twice the T4x2 rate (every
+  # brief so far) and the T4 rate (the human's quota page on 2 Oct suggests it, unconfirmed).
+  rates: [2.0, 1.0]
+
+# The pre-registered decision rule's settings (docs/prerun/P3.6-01.md, section 1).
+decision:
+  # The training cap, configs/train_hypernet.yaml's max_tokens: Pass, Borderline, or Fail.
+  cap_tokens: 8192
+  # B5's 9.5k: whether a cap above 8192 fits.
+  longer_tokens: 9728
+  # Free share of the GPU at the peak needed to pass: 10%, about 2.2 GiB of an L4's 22.5 GiB, for
+  # the fragmentation a long run of mixed lengths adds over this run's minutes.
+  headroom_fraction: 0.10
+  # B5 P3.3's bound on H's forward for all layers and modules on an L4.
+  hypernet_budget_ms: 50
+
+# Budgets and kill criteria the script enforces itself (brief section 7).
+limits:
+  # Seconds from the script's start after which nothing runs: about 3.4 times the 710 s the script
+  # is expected to take (brief section 6). The notebook's hard stop (script_kill_s 3000) comes 600 s
+  # later.
+  max_wall_s: 2400
+  # No point starts with less than this left: the longest point (ddp-9728, about 100 s, estimate)
+  # three times over, so a started point finishes inside the budget.
+  reserve_s: 300
+  # A session whose processes all report nothing for this long is ended: P3.5-01's start-up to a
+  # loaded model took 206 s (session log), and a step at 9.5k should take about 12 s.
+  stall_s: 600
+  # Kill criterion: a step slower than 60 s per micro step on rank 0 (480 s for accumulation 8),
+  # about 5 times the 9.5k step's 12 s (estimate): a run that slow has something wrong.
+  max_step_s: 60
+  # Sessions at most: two planned (4 GPUs, then 1), the rest for the replacements an
+  # out-of-memory point needs (one per failed point).
+  max_sessions: 6
+
+# Seed of the synthetic episodes' colors and augmentations, the mix point's lengths, and z_bar.
+seed: 0
+
+# --smoke: the same code on the CPU with the tiny random Qwen3 (hidden 64, 4 layers) and the
+# stand-in tokenizer, two gloo processes, and short episodes (BRIEF A8). These keys replace the
+# ones above; relative paths are from the repository root.
+smoke:
+  # Keeps smoke outputs apart from the GPU run's.
+  run_id: P3.6-smoke
+  # Smoke outputs under runs/, which git ignores.
+  out_dir: runs/P3.6-smoke/run_logs
+  # The tiny model is built in code: nothing is searched for.
+  model_dir: null
+  # The tiny model, the CPU, and lengths it handles in milliseconds.
+  train:
+    # The random stand-in weights.
+    model_id: smoke/tiny-random-qwen3
+    # BRIEF A0: no local GPU work.
+    device: cpu
+    # CPU bf16 matmuls are slow, and the smoke checks logic, not precision.
+    dtype: float32
+    # SDPA on the CPU.
+    attn_implementation: sdpa
+    # The longest smoke point.
+    max_tokens: 256
+    # H's widths shrunk to the tiny base (hidden 64); scope and seed as above.
+    hypernet:
+      # The tiny base's hidden size.
+      embed_dim: 64
+      # Shrunk trunk.
+      latent: 32
+      # Shrunk heads.
+      head_in: 16
+  # Every kind of point, both session sizes (2 gloo processes, then 1), and a mix point with
+  # accumulation 2 that the projection calibrates on.
+  points:
+    - {name: ddp-64, kind: fixed, gpus: 2, accum: 1, tokens: 64}
+    - {name: ddp-128, kind: fixed, gpus: 2, accum: 1, tokens: 128}
+    - {name: mix-accum2, kind: mix, gpus: 2, accum: 2}
+    - {name: ddp-256, kind: fixed, gpus: 2, accum: 1, tokens: 256}
+    - {name: single-64, kind: fixed, gpus: 1, accum: 1, tokens: 64}
+    - {name: single-256, kind: fixed, gpus: 1, accum: 1, tokens: 256}
+    - {name: h-forward, kind: hypernet, gpus: 1, warm_steps: 1, timed_steps: 3}
+  # One untimed step per point: seconds in all.
+  warm_steps: 1
+  # Two timed steps, a median of two.
+  timed_steps: 2
+  # A small histogram within the smoke's lengths, 2 processes, accumulation 2.
+  projection:
+    # Bins of 64 tokens up to 255.
+    bin_tokens: 64
+    # A falling shape, as P3.4's.
+    counts: [3, 2, 1, 1]
+    # The draw's mean (uniform in each bin).
+    mean_tokens: 100.0
+    # A pass of 12 episodes, as the P3.5 fixture's toy split.
+    episodes: 12
+    # The smoke's session size.
+    gpus: 2
+    # The mix point's accumulation.
+    accum: 2
+    # Few draws: the numbers mean nothing on the CPU.
+    samples: 200
+  # The smoke's lengths stand in for 8192 and 9728.
+  decision:
+    # The smoke's "cap".
+    cap_tokens: 128
+    # The smoke's "longer" length.
+    longer_tokens: 256
+  # Generous for a CPU run of seconds.
+  limits:
+    # Ten minutes at most.
+    max_wall_s: 600
+    # A minute kept back.
+    reserve_s: 60
+    # Two minutes of silence ends a session.
+    stall_s: 120
+    # Four sessions at most.
+    max_sessions: 4

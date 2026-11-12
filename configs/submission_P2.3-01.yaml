@@ -1,0 +1,102 @@
+# Submission notebook build for run P2.3-01: one refinement round on DEV4 on 4xL4 (BRIEF B5 P2.3,
+# ADR-015). One series arm, the notebook configuration with the last real pair held out (as
+# P2.1-01's arm) and, after each puzzle's gate, one round: the governor prices it, promote checks
+# the test inputs' voted answers, SGDProvider continues the adapter from a snapshot, and a gate
+# that fails restores the snapshot. It checks the round's mechanics on the GPU: every round ran
+# or was declined with a plan record, every rollback restored the weights (equal fingerprints),
+# the timing records are complete, and the submission is valid. Read by
+# scripts/build_submission.py and scripts/build_kaggle_notebook.py with yaml.safe_load; runbook
+# docs/runbooks/build_submission.md (series mode, hold-out and round arms); pre-run brief
+# docs/prerun/P2.3-01.md. A development build, never to be submitted: its MANIFEST.md says "not
+# for submission" (its notebook is not alyahya737/arc26-submission, and it is a series), and a
+# competition rerun would ignore the arm and run the reference settings once.
+
+# A development notebook of its own, <owner>/<slug>, owner KAGGLE_OWNER of scripts/kaggle_ops.py;
+# a slug belongs to one task branch (docs/prerun/README.md), and alyahya737/arc26-submission
+# keeps only builds meant for submission.
+kaggle_notebook: alyahya737/arc26-refine-rounds
+
+# The same private code dataset as every build (ADR-010). The wheel differs from P2.1-02's (it
+# adds the rounds to arc26/loop.py, SGDProvider to arc26/ttt.py, and the re-decode term to
+# arc26/governor.py), so it needs a new version made from this build.
+code_dataset: alyahya737/arc26-code
+
+# Competition attached: it mounts the data, and only notebooks attached to it get L4s (research
+# note, section 2).
+competition: arc-prize-2026-arc-agi-2
+
+# 4xL4, bf16 (the solver needs it), the hardware of P2.1-01 and P2.0-01, whose per-puzzle times
+# the brief's estimates use, and of the scored rerun. There is no other accelerator to fall back
+# on: NvidiaL4X1 is not granted (Kaggle ran P0.3-01's NvidiaL4X1 push on its default 2xT4, 1
+# Oct), and T4 has no bf16. The pre-run brief sets the 30-minute queue limit; the fallback is
+# waiting.
+accelerator: NvidiaL4
+
+# Same pinned image and install notebook source as every build (ADR-010).
+reference_metadata: reference/kernel-metadata.json
+
+# Same install notebook version as every build (see configs/submission_P0.5-01.yaml).
+kernel_source_versions:
+  sorokin/pip-install-unsloth-flash-patch: 2
+
+# Same model folder name as every build (K0).
+model_slug: qwen3_4b_grids15_sft139
+
+# DEV4, the reference's four development tasks (5 test outputs; 1, 2, 1, and 1 test inputs):
+# B5 P2.3's "integration test on DEV4", and one puzzle per worker. Quoted so YAML never reads an
+# id as a number.
+subset: ["0934a4d8", "36a08778", "981571dc", "aa4ec2a5"]
+
+# One worker per L4, as P2.1-01 and the scored rerun.
+workers: 4
+
+# Same PYTHONHASHSEED as every run since run A: one fixed seed for all comparisons (CLAUDE.md),
+# so round 0 draws the rescoring augmentations of P2.0-01 and P2.1-01.
+hash_seed: 0
+
+# The run solves DEV4 once, with the round arm.
+run_solver: true
+
+# Seconds after the notebook's start: the workers' soft deadline, and the governor's end time,
+# from which each puzzle's budget is its share of the time left (Governor.puzzle_budget). With
+# four puzzles queued for four workers the first three get half of it each, and 36a08778's round
+# (two test inputs, its slowest batch 270 s in P1.1-01) is priced, with the final decode of both
+# inputs, at about 6,400 s, or 7,900 s with both inputs screened, after a round 0 of about
+# 1,340 s, so the round runs only if (end - 300) / 2 - 1,340 >= the price: end >= 15,700, or
+# 18,800 (docs/prerun/P2.3-01.md, section 6). 18,000 s lets every DEV4 round run at its expected
+# shape (36a08778 with one input screened) with room for a round 0 about 1,100 s slower than
+# estimated; with both of its inputs screened 36a08778's round is declined, and its final decode
+# still runs. The run itself is expected to end near 3,000 to 3,400 s, so the deadline never
+# binds on a healthy run.
+solver_end_s: 18000
+
+# Seconds after the start: the hard stop, 900 s after the soft deadline, as P2.1-01. The brief's
+# Timeout is this plus 900 s (19,800 s), for the selection and the logs.
+solver_kill_s: 18900
+
+# The solver's code (task P2.0, ADR-011): hold-out and rounds need the split solver, which trains
+# and decodes in separate calls (arc26.ttt.fit, arc26.decode.decode_puzzle).
+solver: split
+
+# The series, one arm: the round arm. Without rounds it is P2.1-01's arm on DEV4, the control
+# that P2.3-01's round 0 repeats.
+arms:
+  # The notebook configuration, as P2.1-01's arm (the builder requires it first; submission.json
+  # comes from it), with the held-out gate and one round.
+  - name: r256-proj-emb-rounds
+    lora_r: 256
+    lora_targets: [q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj,
+                   embed_tokens, lm_head]
+    # B5 P2.1's rule, the last real pair by index; held out at k = 2 too (B5: a flag, default on,
+    # kept on for P2.1-02's comparison); and out of the test inputs' prompts, which the rounds
+    # need: round 0's test decode feeds their promotion (ADR-013).
+    holdout: {rule: last, k2: true, in_test_prompts: false}
+    # One round (B5 P2.3: max_rounds default 1); tau 9/16, ADR-014's starting value; s' = 32 of
+    # the 128 views (ADR-015: about 61 s per round fit at P2.1-01's DEV40 sizes); the final
+    # decode with the held-out pair back in its prompts, the production path: P2.1-02 recovered
+    # 2.0 DEV40 tasks with it (7.0 against 5.0), so ADR-013 as amended keeps the pair in the
+    # decode that is submitted and the round's plan prices that decode (ADR-015); the
+    # governor's config as committed (P2.4), embedded by the builder.
+    rounds: {max_rounds: 1, tau: 0.5625, continue_steps: 32, final_in_prompts: true,
+             governor: configs/governor.yaml}
+    reason: "The notebook configuration, a held-out pair, and one refinement round with rollback, on DEV4"

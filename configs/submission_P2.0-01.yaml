@@ -1,0 +1,74 @@
+# Submission notebook build for run P2.0-01: the GPU parity run of the split solver (task P2.0,
+# ADR-011). DEV4 on 4xL4 with one worker per GPU, the settings of P0.5-01 and P0.3-01, except
+# `solver: split`: the notebook starts python -m arc26.solver, the reference's statements split
+# into arc26.ttt and arc26.decode, instead of the moved reference. It checks that DEV4's attempts
+# agree with run A's at least as well as two runs of the reference agree with each other, and that
+# every DEV4 puzzle has complete timing records on the split path. Read by
+# scripts/build_submission.py and scripts/build_kaggle_notebook.py with yaml.safe_load; runbook
+# docs/runbooks/build_submission.md; pre-run brief docs/prerun/P2.0-01.md. A development build,
+# never to be submitted: its notebook is not alyahya737/arc26-submission, so its MANIFEST.md and
+# first cell say "not for submission".
+
+# A development notebook of its own, <owner>/<slug>, owner KAGGLE_OWNER of scripts/kaggle_ops.py;
+# a slug belongs to one task branch (docs/prerun/README.md), and alyahya737/arc26-submission
+# keeps only builds meant for submission.
+kaggle_notebook: alyahya737/arc26-split-solver
+
+# The same private code dataset as every build (ADR-010). The wheel differs from P1.3-01's (it
+# adds arc26/solver.py, ttt.py, and decode.py, and RunConfig.solver), so it needs a new dataset
+# version made from this build.
+code_dataset: alyahya737/arc26-code
+
+# Competition attached: it mounts the data, and only notebooks attached to it get L4s (research
+# note, section 2).
+competition: arc-prize-2026-arc-agi-2
+
+# 4xL4, the hardware of run A, on which the parity rule's noise floor g(B, A) = 0.4 was measured,
+# and of P0.5-01, P0.3-01, and the scored rerun. There is no other accelerator to fall back on:
+# NvidiaL4X1 is not granted (Kaggle ran P0.3-01's NvidiaL4X1 push on its default 2xT4, 1 Oct), and
+# T4 has no bf16, which the solver needs. The pre-run brief sets the 30-minute queue limit; the
+# fallback is waiting.
+accelerator: NvidiaL4
+
+# Same pinned image and install notebook source as run A and every build (ADR-010).
+reference_metadata: reference/kernel-metadata.json
+
+# Same install notebook version as run A and every build (see configs/submission_P0.5-01.yaml).
+kernel_source_versions:
+  sorokin/pip-install-unsloth-flash-patch: 2
+
+# Same model folder name as every build (K0).
+model_slug: qwen3_4b_grids15_sft139
+
+# DEV4, the reference's four development tasks (5 test outputs) and the parity fixture's
+# (tests/fixtures/p0_1_reference_dev4.json). Quoted so YAML never reads an id as a number.
+subset: ["0934a4d8", "36a08778", "981571dc", "aa4ec2a5"]
+
+# One worker per L4, as in run A, P0.5-01, P0.3-01, and the scored rerun.
+workers: 4
+
+# PYTHONHASHSEED of the solver, as run A's: the reference seeds its rescoring augmentations with
+# hash(), so the parity check needs the same value (conflict 5); one fixed seed for all
+# comparisons.
+hash_seed: 0
+
+# The run solves DEV4 with the split solver; a development run records timing in
+# run_logs/timing/.
+run_solver: true
+
+# Seconds after the notebook's start, development runs only: the workers' soft deadline, as in
+# configs/submission_P0.5-01.yaml. P0.5-01's session took 1516 s (run A 1568 s), so 3600 s never
+# binds on a healthy run; the longest DEV4 puzzle took 1226 s (P1.1-01).
+solver_end_s: 3600
+
+# Seconds after the start: the hard stop, 900 s after the soft deadline and above run A's longest
+# TTT training (831 s), so the workers stop on their own first. The brief's Timeout is this plus
+# 900 s (5400 s), which leaves time to write submission.json and run_logs after a hard stop.
+solver_kill_s: 4500
+
+# The solver's code (task P2.0, ADR-011): "split" runs python -m arc26.solver, the reference's
+# statements split into arc26.ttt.fit and arc26.decode.decode_puzzle, in both modes; "nvarc", the
+# default until this run passed (the flip, 2 Oct), runs the moved reference. This run is the
+# split's GPU parity check, so this is the one setting that differs from
+# configs/submission_P0.5-01.yaml besides the notebook.
+solver: split

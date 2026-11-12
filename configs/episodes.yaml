@@ -1,0 +1,197 @@
+# Meta-training episodes, task P3.4 (BRIEF B2 Q6, B5 P3.4, B8). Read by scripts/build_episodes.py
+# (yaml.safe_load; every key below is required and no other key is accepted). The push folders of
+# scripts/build_episodes_kernel.py carry a JSON copy. Plan and every number's source:
+# docs/research/meta_training_sources.md ("the note"); runbook docs/runbooks/build_episodes.md.
+
+# The project's one fixed seed (CLAUDE.md). Every random choice draws from random.Random seeded with
+# sha256 of this seed and the choice's name, so one task's episodes survive drops of other tasks.
+seed: 0
+
+# Training max length in tokens: the notebook's 8192. Longer episodes are dropped and counted per
+# source and split (B5 P3.4); the note measured about 0.05% of the mix above it (section 4.3).
+max_tokens: 8192
+
+# P(|D| = 1..5): DEV120's demo counts after P2.1's hold-out, {1: 34, 2: 62, 3: 17, 4: 6, 5: 1},
+# flattened so 4 and 5 demos are not rare (note 4.2). Truncated to a task's pairs and renormalized.
+demo_probs: [0.15, 0.35, 0.30, 0.15, 0.05]
+
+# Color permutations in the augmentation table: ids are 8 * j + 4 * t + k with j below this, so
+# 1024 * 8 = 8192 augmentations. Entry 0 is the identity; the rest permute all 10 colors, background
+# included, as the notebook's permute_rnd_all_ does. The table is written into MANIFEST.json.
+color_permutations: 1024
+
+# Pinned sources (note, "Sources and conventions" and 3.3). Never ARC-AGI-1 and never ReARC's
+# arc_original.zip, which holds ARC-AGI-1 evaluation tasks, six of them DEV120 tasks (gate G0).
+sources:
+  arc2train:
+    # ARC-AGI-2 public training, Apache-2.0. Fetched by a blobless clone whose sparse checkout holds
+    # only data/training/ and data/training.txt, so no evaluation blob is downloaded (G0).
+    repo: https://github.com/arcprize/ARC-AGI-2.git
+    # Commit of 2025-05-15, the tip of main on 1 Oct 2026 (the note's pin).
+    commit: f3283f727488ad98fe575ea6a5ac981e4a188e49
+    # git tree id of data/training at that commit; the fetch compares git's own id with it.
+    tree: dac7259367cc5099ef6a7b604a50a93affbbee33
+    # git blob id of data/training.txt at that commit; the task files must equal its ids.
+    index_blob: 3c3f6f0384dfe22343f7a0e9fc7ad5480b5fb4db
+    # Task files in data/training: 391 ARC-AGI-1 training, 376 ARC-AGI-1 evaluation, 233 new.
+    tasks: 1000
+  rearc:
+    # re_arc.zip alone (MIT): 1000 verified examples per ARC-AGI-1 training task, generated at
+    # seed 42 by ReARC's own generators. Raw URL at the pinned commit.
+    url: https://raw.githubusercontent.com/michaelhodel/re-arc/e5b7f1d06362a76f9d3b8c25154ff1fafca897ce/re_arc.zip
+    # Commit of 2025-02-24 (the note's pin).
+    commit: e5b7f1d06362a76f9d3b8c25154ff1fafca897ce
+    # git blob id of re_arc.zip at that commit; checked beside the sha256.
+    blob: 2365d068ba4564fce626862a93794d7b6ad93fdf
+    # sha256 of re_arc.zip (the note's 4a7c3094...9ac4, full value).
+    sha256: 4a7c309499f450eb47c2117fa06f3c97fe741cf6e7912579c0b5b8cc759e9ac4
+    # Size of re_arc.zip in bytes (51 MB; 724 MB uncompressed, read in place).
+    bytes: 50913541
+    # Generators (re_arc/tasks/<id>.json), one per ARC-AGI-1 training task.
+    tasks: 400
+  barc:
+    # BARC 100k gpt4-description set (MIT dataset card): GPT-4 descriptions, GPT-4o-mini programs,
+    # remixes of 100 seeds. The note's first set; BARC is the one large source the base has not fit.
+    url: https://huggingface.co/datasets/barc0/100k-gpt4-description-gpt4omini-code_generated_problems/resolve/c2c13194e8e144ae04236c4b12af46616df43adc/100k-gpt4-description-gpt4omini-code_generated_problems.jsonl
+    # Hugging Face commit of the dataset repository (the note's pin).
+    revision: c2c13194e8e144ae04236c4b12af46616df43adc
+    # LFS sha256 of the JSONL (the note's b84560f8...2498, full value, from the HF API).
+    sha256: b84560f84e8ce2a8b3848d65d8d928a2b6c5d606d1025cc0f8acead777a32498
+    # Size in bytes (2.55 GB, into /tmp on Kaggle, streamed line by line).
+    bytes: 2550057070
+    # Rows (problems) of the JSONL, per the HF datasets-server size endpoint.
+    rows: 102895
+    # Short name in problem ids: barc:gpt4desc:<sha1(source)[:16]>.
+    name: gpt4desc
+    # Valid pairs kept per problem, the first in file order: 9 covers the largest validation
+    # puzzle (8 pairs) and a training episode (at most 6); BARC problems have 4 to 59 pairs.
+    max_pairs: 9
+
+# Training pool sizes (note 4.4): 100k episodes, 50% BARC, 30% ReARC, 20% ARC-AGI-2 training,
+# shuffled together; a run of N steps (B3: 15k to 70k) consumes the first N, without reuse.
+train:
+  # BARC problems in keyed order, one episode each: distinct tasks matter more than repeats (Q6).
+  barc_tasks: 50000
+  # ReARC episodes from disjoint examples, spread over the 380 training generators (about 79 each,
+  # about 285 of 1000 examples per generator).
+  rearc_episodes: 30000
+  # ARC-AGI-2 training episodes, leave-one-out, spread over the 989 training tasks (about 20 each).
+  arc2train_episodes: 20000
+
+# Validation split by family, 200 puzzles (note 4.5); P3.7 runs the DEV40 code path on them.
+val:
+  # 20 held-out ReARC generators: the 9 ARC-AGI-1 training tasks ARC-AGI-2 dropped (0dfd9992,
+  # 29ec7d0e, 3631a71a, 40853293, 73251a56, 9ecd008a, a3df8b1e, c3f564a4, dc0a314f) plus 11
+  # picks: the first 11 of the 233 generators that are neither BARC seeds (seeds/ of
+  # github.com/xu3kev/BARC at a7b51a6) nor among those 9, in keyed_order(ids, 0, "held-out",
+  # "rearc"). The ARC-AGI-2 training tasks of the 11 leave training too (989 tasks remain).
+  rearc_held_out:
+    - "0dfd9992"
+    - "29ec7d0e"
+    - "321b1fc6"
+    - "3631a71a"
+    - "40853293"
+    - "484b58aa"
+    - "5c0a986e"
+    - "73251a56"
+    - "77fdfe62"
+    - "794b24be"
+    - "94f9d214"
+    - "9ecd008a"
+    - "a3df8b1e"
+    - "b1948b0a"
+    - "c3f564a4"
+    - "c8f0f002"
+    - "ce9e57f2"
+    - "d0f5fe59"
+    - "dc0a314f"
+    - "f1cefba8"
+  # 5 puzzles per held-out generator, from disjoint examples: 100 ReARC puzzles, the clean
+  # unseen-generator test.
+  rearc_puzzles_per_family: 5
+  # 100 BARC problems held out whole (their remixed seeds stay in training: a concept-level test).
+  barc_puzzles: 100
+  # DEV120's joint (train pairs, test pairs, tasks) counts (K0, runs/K0-latest env_probe.json):
+  # each puzzle draws its shape from them, so validation looks like the evaluation set.
+  sizes:
+    - [2, 1, 19]
+    - [2, 2, 15]
+    - [3, 1, 43]
+    - [3, 2, 17]
+    - [3, 3, 2]
+    - [4, 1, 8]
+    - [4, 2, 9]
+    - [5, 1, 1]
+    - [5, 2, 4]
+    - [5, 3, 1]
+    - [6, 2, 1]
+  # Redraws of a ReARC puzzle whose validation episode exceeds max_tokens before it counts short.
+  max_attempts: 20
+
+# Toy split for P3.5's acceptance run: 200 training puzzles, 10 episodes each (note 4.5).
+toy:
+  # BARC training problems.
+  barc: 100
+  # ReARC training generators, distinct, with examples after their training episodes'.
+  rearc: 60
+  # ARC-AGI-2 training tasks.
+  arc2train: 40
+  # Episodes per toy puzzle, leave-one-out over its pairs.
+  episodes_per_puzzle: 10
+  # Pairs per BARC or ReARC toy puzzle: room for 5 demos and a query with variety.
+  pairs_per_puzzle: 8
+
+# Leakage gates of the checker notebook (note 2.3).
+gates:
+  # G4 and G5 gate only grids of at least this many cells: the note measured 1 exact and 58
+  # canonical false positives at 25 cells against 80,000 unrelated ReARC grids, 38 and 681 at 9.
+  min_cells: 25
+  # ... and at least this many colors (single-color grids match by chance).
+  min_colors: 2
+  # Evaluation test pairs injected under a random dihedral map and color permutation; G3 must
+  # catch all of them, or the check fails.
+  positive_controls: 3
+
+# JSONL shards per split, contiguous runs in pool order (note 3.2: at most 16 per split keeps the
+# output near 30 files, far below Kaggle's file-count limit of about 500, unverified).
+shards:
+  # About 0.3 GB of training episodes: 16 shards of about 18 MB.
+  train: 16
+  # About 300 validation episodes, under 1 MB.
+  val: 1
+  # 2,000 toy episodes, a few MB.
+  toy: 1
+
+# Tasks removed from every split before sampling: the checker's "drop" list, pasted with a reason
+# after a failed check, then rebuild and re-check (note 2.3). Items: {source, task_id, reason}; a
+# task_id "seed:<id>" drops every task of its source that names that seed (BARC problems).
+drop:
+  # Checker run P3.4-check (alyahya737/arc26-p3-4-leakage v1, manifest af589287, 1 Oct): gate G5,
+  # an output grid of this ARC-AGI-2 training task equals the test output of evaluation task
+  # 89565ca0 under a dihedral map and color permutation (canonical match); it was in train and toy.
+  - {source: arc2train, task_id: "b7999b51", reason: "leakage check"}
+
+# --smoke: the same code on synthetic data (scripts/build_episodes.py smoke_sources), offline.
+# These values replace the ones above; the sources come from the synthetic files.
+smoke:
+  # A small table, enough to exercise the ids.
+  color_permutations: 16
+  train:
+    # More than the synthetic problems, so every one is used and every planted leak is reached.
+    barc_tasks: 1000
+    rearc_episodes: 60
+    # About 11 per synthetic task, above any task's pair count, so every pair is a query once.
+    arc2train_episodes: 120
+  val:
+    # Synthetic generators; a1000000 shares its family with the ARC task of the same id.
+    rearc_held_out: ["a1000000", "b1000000"]
+    rearc_puzzles_per_family: 2
+    barc_puzzles: 3
+  toy:
+    barc: 3
+    rearc: 2
+    arc2train: 2
+    episodes_per_puzzle: 3
+    pairs_per_puzzle: 6
+  shards:
+    train: 3

@@ -1,0 +1,244 @@
+# The KV4 cache of task P5.5 (docs/tasks/P5.5.md, candidate 1) on the fork
+# jpezzulli/sglang-rtxpro6000 at d00d88efc8d6281b12be4f4073126aec95038c55: the engine's additions
+# for a P5.2-01 revision and for the Modal test P5.5-01 (scripts/modal_probe.py, its own config
+# takes these lists). Not a complete fn_probe.py config: a run's config copies `engine.env` and
+# `patches.items` from here on top of configs/P5.2-01.yaml (revision 16), whose flags stay as
+# they are; in particular `--kv-cache-dtype fp8_e4m3` stays, since the switch below selects the
+# pool. The kernels, the reference and the pool are scripts/fn_kvq/; tests/test_fn_kvq.py checks
+# every edit below against the fork's files at /tmp/fnsg/penny when the clone is present.
+#
+# Shipping fn_kvq: the patched engine does `from fn_kvq.sglang_kv4 import ...` (only when
+# ARC26_KV4 is on), so the folder that holds fn_kvq/ must be on the server process's sys.path.
+# The arc26 wheel is not changed (the competition path's wheel stays byte for byte). On Kaggle:
+# the code dataset (inputs.code.path, /kaggle/input/datasets/alyahya737/arc26-code-fn) gains
+# the folder fn_kvq/ beside fn_probe.py (scripts/build_fn_notebooks.py, DATASET_SCRIPTS and the
+# fn_code.json listing, which fn_probe.py checks against build.files), and engine.env below gets
+# PYTHONPATH: /kaggle/input/datasets/alyahya737/arc26-code-fn (stage_cuda hands engine.env to
+# the inner process, which the server inherits). On Modal: the job's code mount, the same way.
+#
+# Bytes per token per GPU (fn_kvq.layout.bytes_per_token; the map note
+# docs/research/fn_kv_compress_map.md on task/ideas, e6f3e9b): FP8 6,912; ARC26_KV4=1 (K and V
+# INT4, group 32, FP16 scales) 12 x 2 x 144 + 768 = 4,224, so revision 15's estimated pool of
+# 169,728 becomes about 277,696 tokens (1.64x); ARC26_KV4=v (K FP8, V INT4) 12 x (256 + 144) + 768
+# = 5,568, about 210,688 (1.24x). The pool grows by itself: the cell-size edit prices the packed
+# rows.
+
+run_id: P5.5-01
+
+# The one switch (and its two knobs), read by fn_kvq.sglang_kv4 at the engine's import.
+engine:
+  env:
+    # "1" (or "kv"): K and V INT4; "v": V only, K stays FP8 (the fallback the methods note names,
+    # docs/research/fn_kv_compress_methods.md on task/ideas, 6bb4e15); "0" or unset: the FP8 path
+    # of revision 16, byte for byte (nothing of fn_kvq is imported), for the A/B's baseline boot.
+    ARC26_KV4: "1"
+    # The 64-point block Hadamard rotation on write, undone in the gather: "1" on (the methods
+    # note's recipe: llama.cpp PR 21038, arXiv 2504.04823), "0" off, for the A/B.
+    ARC26_KV4_HADAMARD: "1"
+    # Channels per FP16 scale: 32 (144 bytes per row); 64 would give 136 (1.71x) at a coarser
+    # scale, 16 gives 160 (1.52x). Must divide 64.
+    ARC26_KV4_GROUP: "32"
+
+# The hash-guarded edits (scripts/fn_probe.py apply_patch): the five of configs/P5.2-01.yaml
+# revision 16 first, unchanged, then the KV4 ones. In one file the edits chain: each
+# sha256_before is the previous edit's sha256_after. The KV4 edits add no fallback flag: when one
+# does not apply, patches.json says so and the boot with ARC26_KV4=1 would fail at the first
+# forward, so the run must then boot with ARC26_KV4=0 (the brief's rule).
+patches:
+  items:
+    - name: fa2_scratch_dtype
+      file: sglang/srt/layers/attention/qwen_sparse_attn_backend.py
+      sha256_before: 2ce24d66d6a0bff0e22ff0819291649a4169937f32c5c28241215c6eb119ad54
+      sha256_after: acd14f247ad36cc35540a592dc00ed809a671a36cb5b47654b89ac1ed98f1209
+      pattern: "(scratch_capacity,\\s*k_buffer\\.shape\\[1\\],\\s*k_buffer\\.shape\\[2\\],\\s*)k_buffer\\.dtype,"
+      replacement: "\\g<1>q.dtype,"
+      count: 1
+      fallback_flags: {--kv-cache-dtype: bfloat16}
+    - name: logits_gather_nccl
+      file: sglang/srt/layers/logits_processor.py
+      sha256_before: 96e9d0a403b5301b1fac17206819c262b22ac8fb3a3e1719c1bfcc0df4053574
+      sha256_after: ec4fb9517065c9ecc739f3c3fd92717d0a3375f994eec83f67eb32ca6a413ea8
+      pattern: "enabled=self\\.do_tensor_parallel_all_gather and not self\\.use_attn_tp_group,"
+      replacement: "enabled=False,"
+      count: 1
+      fallback_flags: {}
+    - name: marlin_moe_torch_sum
+      file: sglang/srt/layers/moe/fused_moe_triton/fused_marlin_moe.py
+      sha256_before: fab293ee5aaa0d285d161c3bbf23606d2908fe3273eae5f32eb5b49db52f81e4
+      sha256_after: 971eda94081f6bd637af0764623d97beaecd8bc2df9b1cdc1be049400d3f1e44
+      pattern: "(?m)^( *)moe_sum_reduce\\(\\n *intermediate_cache3,\\n *output,\\n *routed_scaling_factor,\\n *\\)$"
+      replacement: "\\g<1>torch.sum(intermediate_cache3, dim=1, out=output)\\n\\g<1>if routed_scaling_factor != 1.0:\\n\\g<1>    output.mul_(routed_scaling_factor)"
+      count: 1
+      fallback_flags: {}
+    - name: marlin_ep_mask_import
+      file: sglang/srt/layers/moe/moe_runner/marlin.py
+      sha256_before: e1db2b78559fd7ed482710f0b95104339ebcd41721a3cb85e17fbc63ab683734
+      sha256_after: 09110ecb55c308d357886f90e2068535c971c3892de0099861d74b7e3e48150b
+      pattern: "(?m)^(    from sglang\\.srt\\.layers\\.quantization\\.marlin_utils import marlin_make_workspace\\n)"
+      replacement: "\\g<1>    from sglang.srt.runtime_context import get_parallel\\n"
+      count: 1
+      fallback_flags: {--expert-parallel-size: 1}
+    - name: marlin_ep_mask_map
+      file: sglang/srt/layers/moe/moe_runner/marlin.py
+      sha256_before: 09110ecb55c308d357886f90e2068535c971c3892de0099861d74b7e3e48150b
+      sha256_after: 86c0031252e00deebdedc25db8b8c8f1939ea6bcc858d04992ecb111e3640ae2
+      pattern: "(?m)^(        )expert_map=quant_info\\.expert_map,$"
+      replacement: "\\g<1>expert_map=(quant_info.expert_map if quant_info.expert_map is not None or get_parallel().moe_ep_size == 1 else topk_output.topk_ids.new_empty(0)),"
+      count: 1
+      fallback_flags: {--expert-parallel-size: 1}
+
+    # KV4, the backend (qwen_sparse_attn_backend.py, after fa2_scratch_dtype). Four edits, in this
+    # order: the call sites first, the module-level helpers last (the helpers mention the fork's
+    # gather by name, which would make the rename's count 3).
+    # 1. The FA2 scratch's head dim from the layer, not from the pool buffer: a packed row is 144
+    #    bytes, the FP8 one 256 (the map note's fact 3). layer.head_dim is 256 in every mode.
+    - name: kv4_backend_scratch_dim
+      file: sglang/srt/layers/attention/qwen_sparse_attn_backend.py
+      sha256_before: acd14f247ad36cc35540a592dc00ed809a671a36cb5b47654b89ac1ed98f1209
+      sha256_after: aa7eab3b259f0b9761a9025676a300e0448d913bfb4b0c9484fef59b2f28d419
+      pattern: "(k_buffer\\.shape\\[1\\],\\s*)k_buffer\\.shape\\[2\\],(\\s*q\\.dtype,)"
+      replacement: "\\g<1>layer.head_dim,\\g<2>"
+      count: 1
+      fallback_flags: {}
+    # 2. Both decode gathers (the FA2 path and the TRT-LLM one, which never runs on sm89) through
+    #    the shim: packed buffers go to fn_kvq's dequant gather, others to the fork's kernel.
+    - name: kv4_backend_extract
+      file: sglang/srt/layers/attention/qwen_sparse_attn_backend.py
+      sha256_before: aa7eab3b259f0b9761a9025676a300e0448d913bfb4b0c9484fef59b2f28d419
+      sha256_after: a597b04aa7abfb65239c65d216493b18e7c2190a780fdc954b20d3c7136f9f2b
+      pattern: "qwen_sparse_kv_extraction_compact_triton\\("
+      replacement: "_arc26_kv_extract("
+      count: 2
+      fallback_flags: {}
+    # 3. The chunked-prefill staging of a request's whole context (the map note's fact 1): a
+    #    dequantized BF16 copy in place of the FP8 index_select (88 MB per layer call at 86k
+    #    tokens against 44 MB today, transient).
+    - name: kv4_backend_extend_gather
+      file: sglang/srt/layers/attention/qwen_sparse_attn_backend.py
+      sha256_before: a597b04aa7abfb65239c65d216493b18e7c2190a780fdc954b20d3c7136f9f2b
+      sha256_after: 333e144136674f7433016e7a258e3d0a4fc9ca4d9b2977cac3802ebfb930ec1a
+      pattern: "k_buffer\\.index_select\\(0, gather_index\\),\\s*v_buffer\\.index_select\\(0, gather_index\\),"
+      replacement: "*_arc26_kv_gather(k_buffer, v_buffer, gather_index, q.dtype),"
+      count: 1
+      fallback_flags: {}
+    # 4. The two shims, before the metadata class, gated on ARC26_KV4 read once at import: off,
+    #    each shim is the fork's own call whatever the buffers' dtype (the FP8 pool stores uint8
+    #    and hands the backend a float8 view, but no dtype test is relied on); on, a packed
+    #    (uint8) buffer is the KV4 pool's. fn_kvq is imported only on that path.
+    - name: kv4_backend_helpers
+      file: sglang/srt/layers/attention/qwen_sparse_attn_backend.py
+      sha256_before: 333e144136674f7433016e7a258e3d0a4fc9ca4d9b2977cac3802ebfb930ec1a
+      sha256_after: 35516a7114a70842bc6198d9ab9d504c90d5eac285e5005dd18122603ab827d1
+      pattern: "(?m)^class QwenSparseAttnMetadata\\(msgspec\\.Struct, frozen=True\\):$"
+      replacement: |-
+        import os as _arc26_os
+
+        # arc26 P5.5: the switch, read once at import; off, the shims below are the fork's own calls.
+        _ARC26_KV4 = _arc26_os.environ.get("ARC26_KV4", "0").strip().lower() not in ("", "0", "off", "false")
+
+
+        def _arc26_kv_extract(k, v, *args):
+            # arc26 P5.5: with the switch on, a packed (uint8) buffer is the KV4 pool's.
+            if not _ARC26_KV4 or (k.dtype != torch.uint8 and v.dtype != torch.uint8):
+                return qwen_sparse_kv_extraction_compact_triton(k, v, *args)
+            from fn_kvq.sglang_kv4 import kv_extract_compact
+
+            return kv_extract_compact(k, v, *args)
+
+
+        def _arc26_kv_gather(k, v, index, dtype):
+            # arc26 P5.5: the chunked-prefill staging, dequantized for the KV4 pool's packed buffers.
+            if not _ARC26_KV4 or (k.dtype != torch.uint8 and v.dtype != torch.uint8):
+                return k.index_select(0, index), v.index_select(0, index)
+            from fn_kvq.sglang_kv4 import kv_gather_rows
+
+            return kv_gather_rows(k, v, index, dtype)
+
+
+        class QwenSparseAttnMetadata(msgspec.Struct, frozen=True):
+      count: 1
+      fallback_flags: {}
+
+    # KV4, the pool class (kv_cache_configurator.py): the QSA pool's full-attention sub-pool is
+    # fn_kvq.sglang_kv4.KV4MHATokenToKVPool when ARC26_KV4 is on (the map note's candidate 1c).
+    # The anchor is the hybrid-linear site (the SWA site has other neighbours). Hashes: the
+    # wheel's file (pennyroyal-v253's sglang-0.5.19+gd00d88efc8d6, runs/wheel-peek, 1751fd54...),
+    # which differs from the clone's d00d88e (a759ae97...) in its no_intermediate_ssm lines
+    # 2112 to 2195 only; the Kaggle CPU twin of revision 18 refused the clone's hash.
+    - name: kv4_pool_class_helper
+      file: sglang/srt/mem_cache/kv_cache_configurator.py
+      sha256_before: 1751fd5464932ce1eadbdca19f069bbdc354b429432b43aabfc3e1fcb776dae7
+      sha256_after: 4c37252d943a57dfd6cf31162c730a2337298f48245a7425fa93e1f27f3185b7
+      # Anchored above the class's decorator (revision 20): revision 19 anchored on the class line
+      # and put the helper between @dataclass(slots=True, kw_only=True) and the class, so the
+      # decorator wrapped the helper and the module failed to import ("'function' object has no
+      # attribute '__mro__'", version 15 on Kaggle) whatever ARC26_KV4 was.
+      pattern: "(?m)^@dataclass\\(slots=True, kw_only=True\\)\\nclass KVCacheConfigurator:$"
+      replacement: |-
+        def _arc26_kv4_pool_class(default):
+            # arc26 P5.5: ARC26_KV4=1 (or kv, v) swaps the QSA layers' MHA pool for the packed INT4 one.
+            import os
+
+            if os.environ.get("ARC26_KV4", "0").strip().lower() in ("", "0", "off", "false"):
+                return default
+            from fn_kvq.sglang_kv4 import KV4MHATokenToKVPool
+
+            return KV4MHATokenToKVPool
+
+
+        @dataclass(slots=True, kw_only=True)
+        class KVCacheConfigurator:
+      count: 1
+      fallback_flags: {}
+    - name: kv4_pool_class
+      file: sglang/srt/mem_cache/kv_cache_configurator.py
+      sha256_before: 4c37252d943a57dfd6cf31162c730a2337298f48245a7425fa93e1f27f3185b7
+      sha256_after: 909547275e10a1a695da6bf0409c7295f3f2b38080b66888192c1d03175aeddb
+      pattern: "(?m)^(            )full_kv_pool_class=full_pool_class,\\n            quant_method=quant_method,\\n            post_capture_active=self\\.post_capture_kv_active and quant_method is None,$"
+      replacement: "\\g<1>full_kv_pool_class=_arc26_kv4_pool_class(full_pool_class),\\n\\g<1>quant_method=quant_method,\\n\\g<1>post_capture_active=self.post_capture_kv_active and quant_method is None,"
+      count: 1
+      fallback_flags: {}
+
+    # KV4, the byte accounting (pool_configurator.py): the full-attention term of the cell size
+    # prices the packed rows, so max_total_num_tokens grows to the pool the bytes allow.
+    - name: kv4_cell_size_helper
+      file: sglang/srt/model_executor/pool_configurator.py
+      sha256_before: 1552a9d70a042c189902e695f56f015bfc1c360cb6f9cbbee4b7815fa2ad94db
+      sha256_after: 7ba61d3c769870df1e6097e8791fa770c9f2193b36f8236d6eb75254b33c8a67
+      pattern: "(?m)^def _dflash_draft_cell_size\\(kvc: KVCacheConfigurator\\) -> int:$"
+      replacement: |-
+        def _arc26_kv4_cell_size(n, head_dim, v_head_dim, layers, kv_size):
+            # arc26 P5.5: the packed INT4 rows' bytes when ARC26_KV4 is on (fn_kvq.layout).
+            import os
+
+            if os.environ.get("ARC26_KV4", "0").strip().lower() in ("", "0", "off", "false"):
+                return n * (head_dim + v_head_dim) * layers * kv_size
+            from fn_kvq.sglang_kv4 import kv4_cell_size
+
+            return kv4_cell_size(n, head_dim, v_head_dim, layers, kv_size)
+
+
+        def _dflash_draft_cell_size(kvc: KVCacheConfigurator) -> int:
+      count: 1
+      fallback_flags: {}
+    - name: kv4_cell_size
+      file: sglang/srt/model_executor/pool_configurator.py
+      sha256_before: 7ba61d3c769870df1e6097e8791fa770c9f2193b36f8236d6eb75254b33c8a67
+      sha256_after: 3d0af1bd767d0ec88f7ea8bd9264eba02e2b3a13d645602ce9862da2adf7a13e
+      pattern: "(?m)^            cell_size = \\(\\n                n\\n                \\* \\(model_config\\.head_dim \\+ model_config\\.v_head_dim\\)\\n                \\* effective_num_layers\\n                \\* kv_size\\n            \\)$"
+      replacement: "            cell_size = _arc26_kv4_cell_size(n, model_config.head_dim, model_config.v_head_dim, effective_num_layers, kv_size)"
+      count: 1
+      fallback_flags: {}
+
+    # KV4, the hybrid pool's value head dim (memory_pool.py): it reads the V buffer's last dim,
+    # 144 for a packed row; the Triton backend built for the linear layers sizes its unused
+    # graph buffers from it (triton_backend.py:247, 834, 1027). The MHA pool knows its
+    # v_head_dim (256) in every mode.
+    - name: kv4_hybrid_v_head_dim
+      file: sglang/srt/mem_cache/memory_pool.py
+      sha256_before: 69f7c90f53c58317fd25cd5c15d85cc425de5f6e8c028a55a40c0f62432a2e84
+      sha256_after: 61ca47f543fc14bf93a2d434ab7a5c9e7ab135d18b48bbd8b4847e5067c5135a
+      pattern: "(?m)^(        )return self\\.full_kv_pool\\.get_value_buffer\\(self\\.full_kv_pool\\.start_layer\\)\\.shape\\[\\n            -1\\n        \\]$"
+      replacement: "\\g<1>if getattr(self.full_kv_pool, \"v_head_dim\", None):\\n\\g<1>    return self.full_kv_pool.v_head_dim\\n\\g<1>return self.full_kv_pool.get_value_buffer(self.full_kv_pool.start_layer).shape[-1]"
+      count: 1
+      fallback_flags: {}

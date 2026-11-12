@@ -1,0 +1,209 @@
+# Training config of run X1-01 (task X1): MT-02's meta-training on Modal (4 x L4, Kaggle's chip),
+# warm-started with --init-from from MT-02's ckpt-001000.pt as a set H, to measure Modal's step
+# time against Kaggle's 4xL4 and to check the start step's validation against MT-02's step-1000
+# record.
+# Read by scripts/train_hypernet.py inside the Modal job of configs/modal_X1-01.yaml (built by
+# scripts/build_modal_job.py, launched by scripts/modal_ops.py); runbook docs/runbooks/
+# modal_ops.md, pre-run brief docs/prerun/X1-01.md. Every value equals
+# configs/train_hypernet_MT.yaml except the run id, the aggregator, its warm-start settings, the
+# placeholder paths, the session budget, and the projected-wall kill; reasons of the shared
+# values are there and in configs/train_hypernet.yaml.
+
+# Logs and summary.md name this run and its brief.
+run_id: X1-01
+
+# The Modal job passes the fetched path of P3.4's build as --episodes-root (the volume's
+# kagglehub cache); this value is never used there.
+episodes_root: /vol/inputs
+
+# Builder v2's manifest, as MT-02: --init-from refuses a checkpoint written under another one.
+manifest_sha256: b1f2cd0413efdbe8d00152dd98e76181556907f22477e3079cc07746ad8b7aa8
+
+# The job passes the fetched leakage report's folder as --check-root.
+check_root: /vol/inputs
+
+# MT-02's splits: the pool and the 286 validation episodes whose step-1000 CEs are the reference.
+train_split: train
+val_split: val
+
+# As MT-02 (a RESUME_KEYS value, compared by --init-from).
+max_tokens: 8192
+
+# As MT-02 (ADR-006 amendment; a RESUME_KEYS value).
+loss_includes_eos: true
+
+# MT-02's model id; the embedding cache was written under it.
+model_id: sorokin/qwen3_4b_grids15_sft139/Transformers/bfloat16/1
+
+# The job passes the fetched model folder as --model-dir.
+model_dir: /vol/inputs/model
+
+# One GPU per process.
+device: cuda
+
+# As MT-02: the frozen base in bf16, H and the delta in fp32.
+dtype: bfloat16
+
+# FlashAttention 2 when flash_attn imports (the image pins Kaggle's 2.8.2 wheel); run.json names
+# the kernel used, and the brief's Pass needs flash_attention_2, as MT-02 ran.
+attn_implementation: auto
+
+# As MT-02: MT-02's step times were measured with non-reentrant checkpointing.
+gradient_checkpointing: true
+
+# MT-02's encoder, the cache's namespace (a RESUME_KEYS value).
+encoder:
+  # L = 24 of 36 (Q1).
+  layer: 24
+  # Output-grid pooling (Q1).
+  pool: output
+  # 8 views (P3.2-02).
+  n_perm: 1
+  # The decode path's augment seed (P3.2-02).
+  view_seed: 2
+  # Prefill batch for pairs the cache lacks (none: MT-02 read all 208,030 from it).
+  batch_tokens: 16384
+  # Pairs per encode call, as MT-01.
+  chunk_pairs: 256
+
+# The job passes the fetched cache as --embedding-cache.
+embedding_cache: /vol/inputs/embedding_cache
+
+# H of configs/hypernet.yaml with the set aggregator: --init-from loads MT-02's mean H by name
+# and adds the aggregator at W_o = 0, so the start step's adapters are MT-02's exactly
+# (P3.3b). That makes the step-1000 validation comparable with MT-02's, which a --resume of the
+# mean H cannot give (a resumed run validates first at the next multiple of eval_every).
+hypernet:
+  embed_dim: 2560
+  latent: 512
+  head_in: 384
+  dropout: 0.05
+  rank: 16
+  alpha: 32
+  target_modules: [q_proj, k_proj, v_proj, o_proj]
+  seed: 0
+  # configs/hypernet.yaml's set settings (8,877,824 parameters more): H's forward was 4.9 ms of
+  # MT-02's 1.39 s micro step (timing-rank0.jsonl), so the step time stays MT-02's to well under 1%.
+  aggregator:
+    kind: set
+    width: 512
+    blocks: 2
+    heads: 8
+
+# Four processes, one per L4: a RESUME_KEYS value; --init-from refuses another world size.
+gpus: 4
+
+# As MT-02: 32 episodes per optimizer step (a RESUME_KEYS value).
+accum: 8
+
+# MT-02's schedule (RESUME_KEYS values): the cosine continues at MT-02's step 1000.
+steps: 5600
+lr: 4.0e-5
+min_lr: 1.0e-7
+warmup_steps: 100
+
+# As MT-02 (RESUME_KEYS values).
+weight_decay: 0.01
+betas: [0.9, 0.999]
+eps: 1.0e-8
+clip: 1.0
+penalty: none
+penalty_weight: 0.0
+kl_weight: 0.0
+seed: 0
+source_weights:
+  arc2train: 0.20
+  barc: 0.65
+  rearc: 0.15
+
+# The aggregator's own group (P3.3b): the old groups' peak and warmup, untuned. This pilot
+# measures time and the start step, where W_o = 0 makes both settings irrelevant; P3.3-01 sets
+# the values a training run uses.
+new_params_lr: 4.0e-5
+new_params_warmup_steps: 100
+
+# As MT-02: the validation and checkpoint costs per step are part of what the pilot measures.
+eval_every: 200
+ckpt_every: 100
+keep_checkpoints: 2
+
+# The job passes the volume's run folder as --ckpt-dir and --out-dir.
+ckpt_dir: /vol/runs/X1-01/checkpoints
+out_dir: /vol/runs/X1-01/run_logs
+
+# The pilot's session budget, 1,200 s; the job passes the same value as --max-wall-s, capped by
+# its ledger. The pilot needs steps 1001 to 1028 (the ratio is over 1002 to 1028) and the start
+# validation: setup about 360 to 450 s (MT-02 359 s; MT-03 loaded the model in 247 s and the cache
+# in 99 s), the two-reference validation 75 s (MT-03: 75.5 s), and 28 steps at Kaggle's 11.63 s,
+# 326 s: about 760 to 850 s. 1,200 s leaves 350 to 440 s for slower volume reads or steps, and
+# about 60 steps at Kaggle's speed.
+max_wall_s: 1200
+
+# MT-02's limits, except the projection.
+kill:
+  # MT-02's: twice its slowest legitimate step.
+  max_step_s: 150
+  # Modal a third slower than Kaggle: 4,600 steps left at MT-03's 11.63 s are 53,498 s; above
+  # 71,000 s the run stops (exit 4). This session ends (about 60 steps) before the projection is
+  # first checked, so the value guards a longer run of this config only.
+  max_projected_s: 71000
+  # The projection after 100 steps, MT-02's (it needs a mean over a fair sample of steps).
+  projection_after_steps: 100
+
+# --smoke runs these settings on the CPU, as configs/train_hypernet_MT.yaml's smoke, so a warm
+# start from that smoke's checkpoint passes --init-from's checks (scripts/modal_ops.py --smoke).
+smoke:
+  # Keeps these outputs apart from the other configs' smokes.
+  run_id: X1-smoke
+  # The fixture build and its synthetic check report (paths from the repository root).
+  episodes_root: tests/testdata/train_hypernet/episode_build
+  manifest_sha256: 15317ba48d7efefab0b37aaa69727454cb3fd71141140a1cd1d018c4013b0550
+  check_root: tests/testdata/train_hypernet/check
+  # The fixture has no train split; its toy split stands in.
+  train_split: toy
+  # The tiny random Qwen3 and the stand-in tokenizer, built in code.
+  model_id: smoke/tiny-random-qwen3
+  model_dir: null
+  # CPU only (BRIEF A0), fp32, SDPA.
+  device: cpu
+  dtype: float32
+  attn_implementation: sdpa
+  # No cache: the smoke encodes the fixture's pairs itself.
+  embedding_cache: null
+  # The MT smoke's encoder.
+  encoder:
+    layer: 2
+    batch_tokens: 4096
+    chunk_pairs: 4
+  # The MT smoke's widths, with a set aggregator shrunk to them (width 16, 2 heads).
+  hypernet:
+    embed_dim: 64
+    latent: 32
+    head_in: 16
+    aggregator:
+      kind: set
+      width: 16
+      blocks: 2
+      heads: 2
+  # The MT smoke's processes, accumulation, and schedule (RESUME_KEYS values).
+  gpus: 2
+  accum: 2
+  steps: 12
+  lr: 3.0e-3
+  min_lr: 1.0e-4
+  warmup_steps: 2
+  # The aggregator's group at the smoke's peak and warmup.
+  new_params_lr: 3.0e-3
+  new_params_warmup_steps: 2
+  # Validation and checkpoints every 4 steps, as the MT smoke.
+  eval_every: 4
+  ckpt_every: 4
+  # Outputs under runs/, which git ignores (the Modal smoke passes its own folders).
+  ckpt_dir: runs/X1-smoke/checkpoints
+  out_dir: runs/X1-smoke/run_logs
+  # Generous limits for a CPU run of seconds.
+  max_wall_s: 600
+  kill:
+    max_step_s: 60
+    max_projected_s: 600
+    projection_after_steps: 4

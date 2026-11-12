@@ -1,0 +1,96 @@
+# Run P5.6-01 (task P5.6, brief docs/prerun/P5.6-01.md): configuration 8B of
+# docs/research/fn_many_streams.md (task/ideas 420afb4, section 4) on Kaggle's 4 x L4, a
+# development run in its own notebook, beside P5.2-01 revision 20 (task/P5.5 c5520c7), whose
+# competition settings it starts from (extends). 8B is 8A's config-only levers plus revision 20's
+# KV4 cache and the vision skip: the lazy Mamba ping-pong slot with the skip lock (3 slots per
+# request instead of 5), the static fraction 0.96, no VLM cache reserve, the vision tower off, a
+# server limit of streams + 1 (the note's section 3.4: version 14's 738 s hold was the
+# scheduler's batch_is_full latch double-counting a chunked request), and decode graphs at
+# 1 2 4 6 8. Expected pool about 377,408 KV4 tokens, 8 streams at about 47,176 (estimate). A
+# batch sweep (fn_probe.stage_sweep) measures decode at 1 to 8 before the solve; a boot ladder
+# falls back to revision 20's flags, then revision 16's engine, then BF16 eager. Every value
+# below is revision 20's but those each comment names.
+extends: configs/P5.2-01.yaml
+
+run_id: P5.6-01
+
+kernel:
+  # Its own notebook (the human submits it if it reads Good): not arc26-submission, which
+  # revision 20's approval cron pushes.
+  id: alyahya737/arc26-fn-8b
+  title: arc26 fn 8b
+  # Its own code dataset: one per concurrent build lineage (the human, 9 Oct), since this
+  # lineage's fn_probe.py (the sweep, the ladder's variable removal) differs from revision 20's.
+  code_dataset: alyahya737/arc26-code-fn-8b
+
+inputs:
+  code:
+    path: /kaggle/input/datasets/alyahya737/arc26-code-fn-8b
+    # This lineage's dataset first; the older names still match a Modal job's code mount.
+    hint: [arc26-code-fn-8b, arc26-code-fn]
+
+engine:
+  flags:
+    # The lazy second ping-pong slot and (env below) the skip lock: 3 Mamba slots per request
+    # instead of 5 (kv_cache_configurator.py:150-161; the note's section 3.1). Untested on this
+    # model: rung 1 below returns to extra_buffer.
+    --mamba-radix-cache-strategy: extra_buffer_lazy
+    # 0.96 (revision 20: 0.95): 855 MiB were unused at version 14's peak; 0.216 GiB per GPU more
+    # pool, a margin of about 0.39 GiB at 8 streams (the note's 8B row, estimate).
+    --mem-fraction-static: 0.96
+    # The vision skip (fn_l4_memory.md risk 5): 0.21 GiB of weights and the 0.10 reserve per GPU;
+    # an untested path (1D positions), so prefill graphs are explicitly off, as the note says.
+    --json-model-override-args: {language_model_only: true}
+    --cuda-graph-backend-prefill: disabled
+    # 8 client streams + 1 (the latch, the note's section 3.4).
+    --max-running-requests: 9
+    # 3 x 9 + 2: 3 per request under lazy + skip lock for the 9 server slots, plus 2 spare.
+    --max-mamba-cache-size: 29
+    # Graphs at 1 2 4 6 8 (about 0.27 GiB, the note's section 3.3); the client never sends 9.
+    --cuda-graph-max-bs-decode: 8
+    --cuda-graph-bs-decode: [1, 2, 4, 6, 8]
+  env:
+    # The skip lock: the matched prefix's state is evictable during decode (environ.py:1241-1245).
+    SGLANG_OPT_MAMBA_SKIP_DECODE_LOCK: "1"
+    # No VLM cache reserve (0.10 GiB per GPU; text never fills it).
+    SGLANG_VLM_CACHE_SIZE_MB: "0"
+  # The ladder after the first boot (8B), cumulative (fn_probe.boot_rungs). Each rung follows a
+  # failed boot or a failed first generation; restarts.jsonl records the reason, and the planner
+  # reads the pool of whichever boot served.
+  boot_ladder:
+    # Rung 1: revision 20's flags and variables exactly (extra_buffer, 0.95, the vision tower on,
+    # 5 streams, Mamba 29, graphs 1 to 5, KV4 on): null removes 8B's own.
+    - flags: {--mamba-radix-cache-strategy: extra_buffer, --mem-fraction-static: 0.95,
+              --json-model-override-args: null, --cuda-graph-backend-prefill: null,
+              --max-running-requests: 5, --max-mamba-cache-size: 29,
+              --cuda-graph-max-bs-decode: 5, --cuda-graph-bs-decode: [1, 2, 3, 4, 5]}
+      env: {SGLANG_OPT_MAMBA_SKIP_DECODE_LOCK: null, SGLANG_VLM_CACHE_SIZE_MB: null}
+    # Rung 2: revision 16's engine (the KV4 files restored, ARC26_KV4=0, fn_probe.restore_kv4).
+    - {env: {ARC26_KV4: "0"}}
+    # Rung 3: BF16 KV and no CUDA graphs, still revision 16's engine.
+    - {flags: {--kv-cache-dtype: bfloat16, --cuda-graph-backend-decode: disabled,
+               --cuda-graph-backend-prefill: disabled}}
+
+solve:
+  # 8 (revision 20: 5): the server's 9 less the latch's one.
+  max_streams: 8
+
+# The batch sweep before the solve (fn_probe.stage_sweep; the note's cheapest test 1 and
+# fn_900_toks.md, aa8f2f6): decode at 1, 2, 4, 6, 8 concurrent requests, 512 tokens each with
+# ignore_eos, about 3 minutes (estimate: 512 tokens at 20 to 45 per second per stream).
+sweep:
+  enabled: true
+  modes: [development]
+  batches: [1, 2, 4, 6, 8]
+  max_new: 512
+  # A short prompt (about 100 tokens); the radix cache serves it after the first request.
+  prompt: "Each grid is rows of digits. In every example the output grid is the input grid with every 1 replaced by 2. Example input: 0 1 0 / 1 0 1 / 0 1 0. Example output: 0 2 0 / 2 0 2 / 0 2 0. Describe the rule in detail, then apply it to 1 1 0 / 0 1 1 / 1 0 0."
+  # Seconds for one size's requests (512 tokens at 10 per second is 51 s).
+  timeout_s: 300
+  # No size starts within 30 minutes of the generation stop: the solve keeps its time.
+  stop_before_s: 1800
+
+smoke:
+  # The fake server's sweep: two sizes, short replies.
+  sweep: {enabled: true, modes: [development], batches: [1, 2], max_new: 64, timeout_s: 30,
+          stop_before_s: 5, prompt: "0 1 / 1 0"}

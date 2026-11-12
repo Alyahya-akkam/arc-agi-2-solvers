@@ -1,0 +1,54 @@
+# Submission notebook build for run P1.1-01: the full DEV120 development run on 4xL4 (BRIEF B5
+# P1.1), the same notebook as configs/submission_P0.5-01.yaml with every task and the full-run
+# deadlines. Its version is also the candidate for Submission 1 (P1.2). Built from the same commit
+# as P0.5-01, so both pre-run briefs share one Code-commit. Read by scripts/build_submission.py and
+# scripts/build_kaggle_notebook.py with yaml.safe_load; runbook docs/runbooks/build_submission.md.
+
+# The GPU notebook, shared with P0.5-01: the P1.1-01 pre-run brief names it too, so the gateway
+# refuses CPU pushes to it.
+kaggle_notebook: alyahya737/arc26-submission
+
+# The same private code dataset as P0.5-01; one build commit, one wheel, one dataset version.
+code_dataset: alyahya737/arc26-code
+
+# Competition attached: it mounts the data, and only notebooks attached to it get 4xL4.
+competition: arc-prize-2026-arc-agi-2
+
+# 4xL4, the hardware of the scored rerun: P1.1's timing table must transfer to it (CLAUDE.md,
+# accelerators: timing runs that must match the rerun use 4xL4).
+accelerator: NvidiaL4
+
+# Same pinned image and model as P0.5-01 (ADR-010).
+reference_metadata: reference/kernel-metadata.json
+
+# Same install notebook version as P0.5-01 (see configs/submission_P0.5-01.yaml).
+kernel_source_versions:
+  sorokin/pip-install-unsloth-flash-patch: 2
+
+# Same model folder name as P0.5-01.
+model_slug: qwen3_4b_grids15_sft139
+
+# DEV120: every task of the public evaluation set (BRIEF B4), 120 tasks and 172 test inputs (K0).
+subset: null
+
+# One worker per L4, as in run A.
+workers: 4
+
+# Same PYTHONHASHSEED as run A and P0.5-01: one fixed seed for all comparisons (CLAUDE.md).
+hash_seed: 0
+
+# The run solves the tasks.
+run_solver: true
+
+# Seconds after the start: the workers' soft deadline, equal to the notebook's competition value
+# (12 h minus 30 min), so this development run measures the timing of the scored rerun.
+solver_end_s: 41400
+
+# Seconds after the start: the hard stop, equal to the competition value (12 h minus 20 min). The
+# P1.1-01 brief's Timeout must be 43200 s, Kaggle's maximum, to leave the write its 20 minutes.
+solver_kill_s: 42000
+
+# The solver's code (task P2.0, ADR-011): this run ran the moved reference (python -m
+# arc26.nvarc.starter), the default until the split solver passed run P2.0-01 and the default
+# flipped to "split" (2 Oct); the key, added then, keeps this config what ran.
+solver: nvarc

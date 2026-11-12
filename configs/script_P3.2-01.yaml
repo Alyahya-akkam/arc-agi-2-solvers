@@ -1,0 +1,56 @@
+# Script notebook build of run P3.2-01, the pair encoder's throughput and its first embedding
+# cache (task P3.2; BRIEF B5 P3.2, A8, A9). Read by scripts/build_submission.py and
+# scripts/build_kaggle_notebook.py with yaml.safe_load; runbooks docs/runbooks/build_submission.md
+# (script mode) and docs/runbooks/cache_embeddings.md; pre-run brief docs/prerun/P3.2-01.md.
+
+# A script config (task P0.5d): the notebook runs one script, never the solver, and is never
+# submitted.
+kind: script
+
+# Its own notebook, <owner>/<slug>, named in the pre-run brief; no CPU push may use it.
+kaggle_notebook: alyahya737/arc26-p3-2-encoder
+
+# The same private code dataset as every build (ADR-010): a new version made from this build holds
+# the wheel, cache_embeddings.py, and cache_embeddings.yaml.
+code_dataset: alyahya737/arc26-code
+
+# Same competition as the other builds: its evaluation challenges are the file the script reads
+# (DEV40's demonstration pairs), found by search under /kaggle/input.
+competition: arc-prize-2026-arc-agi-2
+
+# 4xL4, of which the script uses one (cuda:0 in configs/cache_embeddings.yaml): B5 asks for a time
+# on one L4. bf16 rules out T4, and NvidiaL4X1 ran on 2xT4 when requested (P0.3-01); the bf16 stop
+# refuses such a session before the install.
+accelerator: NvidiaL4
+
+# Same pinned image and model as the other builds: the stack P1.1-01 ran (torch 2.8.0,
+# transformers 4.55.4), which the scored rerun's encoder (P4.1) runs on too.
+reference_metadata: reference/kernel-metadata.json
+
+# Same install notebook version as the other builds (configs/submission_P0.5-01.yaml).
+kernel_source_versions:
+  sorokin/pip-install-unsloth-flash-patch: 2
+
+# Same model folder name as the other builds: the environment check finds the base by it, and the
+# script finds the same folder by the end of its path (model_id in cache_embeddings.yaml).
+model_slug: qwen3_4b_grids15_sft139
+
+# The encoder script; it imports only arc26 (the wheel, which holds the encoder and DEV40), the
+# image's packages, and the standard library.
+script: scripts/cache_embeddings.py
+
+# Its config, P3.2-01's settings with their reasons.
+script_config: configs/cache_embeddings.yaml
+
+# The commit for run.json: the dataset copy of the script has no git checkout. Nothing else: the
+# script finds its inputs under /kaggle/input itself, and every other setting is in its config.
+args:
+  - --commit
+  - "{commit}"
+
+# Seconds after the notebook's start: the hard stop. The script stops itself first, at its
+# wall-time kill criterion max_wall_s 1800 s, counted from its own start, which follows the
+# environment check and the install (about a minute: install 25 s in P0.5-01, 46 s on the CPU in
+# P0.5d); the 600 s between also cover the script's last cache write and its logs. The brief's
+# Timeout is this plus 300 s, 2700 s.
+script_kill_s: 2400

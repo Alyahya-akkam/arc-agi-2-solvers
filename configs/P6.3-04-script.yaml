@@ -1,0 +1,67 @@
+# Script notebook build of run P6.3-04, two other routes of the agent solver on DEV40 (task P6.3,
+# ADR-020; BRIEF A8, A9): arm D, direct answers; arm L, one long generation in a 64k context. Read by
+# scripts/build_submission.py and scripts/build_kaggle_notebook.py with yaml.safe_load (script
+# mode, task P0.5d; notebook inputs, task P3.5); runbooks docs/runbooks/build_submission.md
+# (script mode) and docs/runbooks/agent_spike.md; pre-run brief docs/prerun/P6.3-04.md.
+
+# A script config: the notebook runs one script, never the solver, and is never submitted.
+kind: script
+
+# Its own notebook, named by the P6.3-04 brief only (one slug per brief; Kaggle may keep a slug's
+# accelerator, and P6.3-02's notebook stays that run's).
+kaggle_notebook: alyahya737/arc26-p6-3-route
+
+# Its own code dataset (the human, 9 Oct: one code dataset per concurrent build lineage): P6.3-02
+# may still be queued or running on alyahya737/arc26-code-p6-agent's files, which this build's
+# must not replace. It holds the wheel, scripts/agent_spike.py, and configs/P6.3-04.yaml.
+code_dataset: alyahya737/arc26-code-p6-route
+
+# The competition: DEV40's evaluation challenges and, for the score, their solutions.
+competition: arc-prize-2026-arc-agi-2
+
+# 4xL4: the INT4 27B needs tensor parallelism over at least two L4s, and the spike measures four
+# (ADR-020). NvidiaL4X1 ran on a T4 without bf16 (P0.3-01), which the notebook's bf16 stop refuses.
+accelerator: NvidiaL4
+
+# The pinned image every script notebook runs (Python 3.11.13, glibc 2.35): the interpreter the
+# wheelhouse was built and install-checked for. Its packages are not used: the engine runs from
+# its own venv with PYTHONPATH removed.
+reference_metadata: reference/kernel-metadata.json
+
+# Same install notebook version as every build: script mode attaches the reference's kernel
+# sources, and the environment check expects them. The spike ignores its packages.
+kernel_source_versions:
+  sorokin/pip-install-unsloth-flash-patch: 2
+
+# Same model folder name as every build: the environment check finds the attached base model by
+# it. The spike does not load it.
+model_slug: qwen3_4b_grids15_sft139
+
+# The two download notebooks' outputs at version 1, their first run
+# (configs/P6.3-download.yaml): the verified weights (MANIFEST.json ok, revision 91bd022d) and the
+# install-checked wheelhouse. If either needs a second run, this pin changes, and so does the
+# brief's Code-commit.
+notebook_inputs:
+  alyahya737/arc26-dl-qwen38-int4: 1
+  alyahya737/arc26-dl-agent-wheels: 1
+
+# The spike: install the engine offline, boot vLLM on 4xL4, the forcing check, arm D, arm L.
+script: scripts/agent_spike.py
+
+# Its config, each value with its reason.
+script_config: configs/P6.3-04.yaml
+
+# The commit for run.json (the dataset copy has no git checkout) and the mount folders of the two
+# download outputs, which the notebook finds by their slugs.
+args:
+  - --commit
+  - "{commit}"
+  - --model-root
+  - "{input:alyahya737/arc26-dl-qwen38-int4}"
+  - --wheelhouse-root
+  - "{input:alyahya737/arc26-dl-agent-wheels}"
+
+# Seconds after the notebook's start: the hard stop. The session's Timeout is 13,400 s, this plus
+# the 300 s the notebook's logs need; the script stops itself at its max_wall_s of 12,600 s after
+# its own start (200.2 s in on 13 Oct, 188.9 s at most before), about 300 s before this.
+script_kill_s: 13100

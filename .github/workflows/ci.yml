@@ -1,0 +1,44 @@
+name: ci
+
+# Every PR, plus pushes to main so the scaffold commit and squash-merges are checked too.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - run: pip install -e ".[dev]"
+      - run: ruff check .
+      # GPU tests are run by the human per docs/runbooks/, never in CI.
+      - run: pytest -m "not gpu"
+
+  # The hypernetwork tests (arc26/hyper/: injection, H, encoder) need torch, transformers, and
+  # peft, which the job above does not install, so there they skip. Here they run on CPU against
+  # the versions in Kaggle's pinned image (run P1.1-01's pip freeze), so CPU results speak for the
+  # stack the GPU runs use.
+  hyper-cpu:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      # The CPU build of torch 2.8.0 from the PyTorch index: about 200 MB, against several GB for
+      # the default CUDA build from PyPI, and no GPU exists on the runner.
+      - run: pip install torch==2.8.0 --index-url https://download.pytorch.org/whl/cpu
+      - run: pip install -e ".[dev]" transformers==4.55.4 peft==0.17.1 safetensors==0.6.2 accelerate==1.11.0
+      # Only the modules that need torch (P3.1 inject, P3.3 hypernet, P3.2 encoder and its cache
+      # script, P3.5 test_train, P4.1 providers); the job above runs everything else, where they skip. Exit code 5
+      # means no test matched, which is expected on branches that predate these modules.
+      - run: |
+          pytest -m "not gpu" -k "inject or hypernet or encoder or cache_embeddings or test_train or providers or test_arms or test_validation or h_validation or h_submission" || [ $? -eq 5 ]
+        env:
+          CUDA_VISIBLE_DEVICES: ""
+          HF_HUB_OFFLINE: "1"

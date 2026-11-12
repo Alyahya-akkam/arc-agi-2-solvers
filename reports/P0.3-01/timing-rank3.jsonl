@@ -1,0 +1,10 @@
+{"puzzle_id": null, "op": "load", "seconds": 11.7871, "tokens": null}
+{"puzzle_id": "aa4ec2a5", "op": "train", "seconds": 305.576237, "tokens": 408320}
+{"puzzle_id": "aa4ec2a5", "op": "decode", "seconds": 72.475623, "tokens": 15728}
+{"puzzle_id": "aa4ec2a5", "op": "selection", "seconds": 8.487882, "tokens": 37224}
+{"puzzle_id": "aa4ec2a5", "op": "selection", "seconds": 8.509708, "tokens": 37224}
+{"puzzle_id": "aa4ec2a5", "op": "decode", "seconds": 94.21203, "tokens": 15668}
+{"puzzle_id": "aa4ec2a5", "op": "selection", "seconds": 8.450963, "tokens": 37224}
+{"puzzle_id": "aa4ec2a5", "op": "decode", "seconds": 72.46915, "tokens": 15668}
+{"puzzle_id": "aa4ec2a5", "op": "decode", "seconds": 72.488196, "tokens": 15728}
+{"puzzle_id": "aa4ec2a5", "op": "puzzle", "seconds": 648.197001, "tokens": null}

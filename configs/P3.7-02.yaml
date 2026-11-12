@@ -1,0 +1,131 @@
+# Submission notebook build for run P3.7-02: H's validation on GEN, the held-out generated
+# puzzles, for gate G4 (BRIEF B5 P3.7, B7 G4; task brief docs/tasks/P3.7.md with its amendments of
+# 4 and 17 Oct; ADR-019). P3.7-01's build with GEN in place of DEV40 and 8 decode views per test
+# input.
+# One launch of python -m arc26.arms builds GEN from P3.4's validation split, checks H, and runs
+# every GEN puzzle under the four adapter sources, paired. Read by scripts/build_submission.py and
+# scripts/build_kaggle_notebook.py with yaml.safe_load; runbook docs/runbooks/h_validation.md;
+# pre-run brief docs/prerun/P3.7-02.md. Never submitted.
+
+# The task brief's second P3.7 notebook, never the submission notebook.
+kaggle_notebook: alyahya737/arc26-h-val-gen
+
+# P3.7's one code dataset, shared with P3.7-01 (the same wheel; one lineage).
+code_dataset: alyahya737/arc26-code-p37
+
+# Competition attached: only notebooks attached to it get 4xL4, and the load check's DEV4
+# fingerprints read its evaluation challenges (no solutions).
+competition: arc-prize-2026-arc-agi-2
+
+# 4xL4, bf16, as P3.7-01 (no fallback): both notebooks can run in the two batch slots at once.
+accelerator: NvidiaL4
+
+# Same pinned image and install notebook source as every build (ADR-010).
+reference_metadata: reference/kernel-metadata.json
+
+# Same install notebook version as every build (see configs/submission_P0.5-01.yaml).
+kernel_source_versions:
+  sorokin/pip-install-unsloth-flash-patch: 2
+
+# Same model folder name as every build (K0).
+model_slug: qwen3_4b_grids15_sft139
+
+# null: GEN replaces the competition's tasks (the builder refuses a subset with gen).
+subset: null
+
+# One worker per L4, as P2.6-01 and P3.7-01.
+workers: 4
+
+# One fixed seed for all comparisons (CLAUDE.md).
+hash_seed: 0
+
+# The run solves GEN once, under every arm.
+run_solver: true
+
+# Seconds after the notebook's first cell: the soft deadline. The expected last worker ends about
+# 15,300 s after the start (estimate: GEN priced from P2.6-01's grid-size strata matched to P3.4's
+# validation token sizes, 8 of 16 views, replayed on four workers), so 4.5 h cuts nothing at that
+# speed and leaves out the shuffled queue's end, paired, if the zero adapter and H decode 40% slower
+# (last worker about 17,400 s: about 4 of 100 puzzles not started).
+solver_end_s: 16200
+
+# Seconds after the notebook's first cell: the hard stop, the soft deadline plus finish_s plus
+# 900 s for the arms' selection and scores (builder rule). The brief's Timeout is this plus 300 s
+# for the logs plus 2,700 s, the pre-script allowance: Kaggle has spent up to about 41 minutes
+# between RUNNING and the first cell (P6.5-02, P6.3-02), and the Timeout may count from RUNNING.
+solver_kill_s: 19500
+
+# The split solver (ADR-011).
+solver: split
+
+# H's scope (ADR-002, ADR-017), as P3.7-01.
+scope:
+  # Rank 16, rsLoRA scale 32 / sqrt(16) = 8, H's rank and alpha.
+  lora_r: 16
+  # q, k, v, o on all 36 layers, H's targets; embed_tokens and lm_head frozen.
+  lora_targets: [q_proj, k_proj, v_proj, o_proj]
+
+# The adapter arms (task P3.7, ADR-019), as P3.7-01's but on GEN with 8 views.
+adapters:
+  # The four arms of G4, in P3.7-01's order.
+  arms:
+    - name: base
+      source: base
+      reason: (a) the zero adapter, the base itself (P3.5), the low end of G4's gap
+    - name: h
+      source: hyper
+      reason: (b) H's adapter from best.pt, the arm G4 reads
+    - name: sgd
+      source: sgd
+      reason: (c) P2.6-01's one-epoch SGD fit at H's scope, the high end of G4's gap
+    - name: h-polish
+      source: hyper_polish
+      # s = 13, ceil(128 / 10): about 10% of the reference's 128-step epoch (B2 Q3, ADR-017).
+      steps: 13
+      reason: (d) H's adapter polished for s = 13 steps, ADR-003's production default
+  # Arm (e) off (the cut order); P4.3 can list it.
+  # 8 views per test input, the same for every arm (task brief amendment 1): every dihedral map
+  # once, its first color permutation, as two full batches of four prompts of one length
+  # (arc26.arms.DIHEDRAL_ONCE, ADR-019). 100 puzzles at 16 views would take about 7.1 h.
+  views: [[0, 4, 10, 14], [2, 6, 8, 12]]
+  # The queue's shuffled order: one fixed seed (CLAUDE.md).
+  order_seed: 0
+  # The teacher-forced CE of every answer (the held-out pair's output) under each arm.
+  ce: true
+  # The longest GEN puzzle's four arms take about 1,800 s (estimate, ReARC's large grids), so
+  # 2,400 s rarely cuts a started puzzle.
+  finish_s: 2400
+  # H's best point: MT-02's best.pt (step 1,000, validation CE 0.024783) in its output, version
+  # 1, as P3.7-01, so both sets read one H and the load check one verdict. A later best point is
+  # P3.7-01's swap: this line, load_check.run_logs, and their notebook_inputs entries.
+  checkpoint: "{input:alyahya737/arc26-mt-train-1}/checkpoints/best.pt"
+  # MT-01's cache, read only: GEN's demonstrations are validation pairs, all in it (MT-01 cached
+  # every pair of P3.4's build, 0 missing), so H's z_bar is MT-02's, copied, not encoded again.
+  cache: "{input:alyahya737/arc26-mt-cache}/embedding_cache"
+  # The expected H config, as P3.7-01.
+  hypernet: configs/hypernet.yaml
+  # P3.4's build 2 and its check: GEN's source and the load check's episodes.
+  episodes_root: "{input:alyahya737/arc26-p3-4-episodes}"
+  check_root: "{input:alyahya737/arc26-p3-4-leakage}"
+  # Build 2's manifest (docs/experiments/P3.4.md).
+  manifest_sha256: b1f2cd0413efdbe8d00152dd98e76181556907f22477e3079cc07746ad8b7aa8
+  # H's load check, as P3.7-01 (the same checkpoint and logs, so the same verdict expected).
+  load_check:
+    # MT-02's run logs, as P3.7-01 (on a swap, the last session's).
+    run_logs: "{input:alyahya737/arc26-mt-train-1}/run_logs"
+    # P3.7-01's tolerances and reasons.
+    max_abs: 1.0e-3
+    max_mean: 1.0e-4
+  # GEN (task brief amendment 1): one episode per held-out puzzle (the lowest index), its query
+  # the test pair; 100 puzzles of P3.4's 200, the first 50 BARC by sorted id and 50 ReARC dealt
+  # round-robin over the 20 held-out families (3 for the first 10 by sorted name, 2 for the rest).
+  gen:
+    barc: 50
+    rearc: 50
+
+# The outputs the arms read, pinned, as P3.7-01 (on a checkpoint swap, the first entry changes).
+notebook_inputs:
+  alyahya737/arc26-mt-train-1: 1
+  alyahya737/arc26-mt-cache: 1
+  alyahya737/arc26-p3-4-episodes: 2
+  alyahya737/arc26-p3-4-leakage: 2

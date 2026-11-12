@@ -1,0 +1,611 @@
+{
+ "run": "runs/P6.10-01",
+ "base": {
+  "name": "shot_base",
+  "present": true,
+  "lost": false,
+  "failure": null,
+  "exit_code": 0,
+  "end": "exited",
+  "phases": {
+   "install": 0,
+   "shot": 0
+  },
+  "install_ok": true,
+  "preflight_ok": true,
+  "boot_s": 356.2,
+  "kv_pool": 1746170,
+  "boot_nan_lines": 0,
+  "boot_tracebacks": 0,
+  "sanity_ok": true,
+  "queued": 15,
+  "shot_tasks": 15,
+  "used": 12,
+  "stopped": "no tasks left",
+  "starts": 15,
+  "caps": [
+   16384
+  ],
+  "max_streams_planned": 15,
+  "degenerate": 0,
+  "engine_error": 0,
+  "engine_gone": false,
+  "engine_exit": 0,
+  "valid": true,
+  "log": {
+   "present": true,
+   "lines": 550,
+   "traceback": 1,
+   "error": 8,
+   "nan": 0
+  },
+  "window": {
+   "samples": 72,
+   "seconds": 710.86,
+   "tokens": 243765.0,
+   "rate": 342.916,
+   "per_stream": 22.861,
+   "t0": 717.81,
+   "t1": 1428.67
+  },
+  "samples": 104,
+  "host": {
+   "gpus": [
+    "NVIDIA L4, 610.57.04, 23034 MiB",
+    "NVIDIA L4, 610.57.04, 23034 MiB",
+    "NVIDIA L4, 610.57.04, 23034 MiB",
+    "NVIDIA L4, 610.57.04, 23034 MiB"
+   ],
+   "devices": [
+    {
+     "name": "NVIDIA L4",
+     "capability": "8.9",
+     "memory_bytes": 23689363456
+    },
+    {
+     "name": "NVIDIA L4",
+     "capability": "8.9",
+     "memory_bytes": 23689363456
+    },
+    {
+     "name": "NVIDIA L4",
+     "capability": "8.9",
+     "memory_bytes": 23689363456
+    },
+    {
+     "name": "NVIDIA L4",
+     "capability": "8.9",
+     "memory_bytes": 23689363456
+    }
+   ],
+   "p2p": {
+    "0->1": true,
+    "0->2": false,
+    "0->3": false,
+    "1->0": true,
+    "1->2": false,
+    "1->3": false,
+    "2->0": false,
+    "2->1": false,
+    "2->3": true,
+    "3->0": false,
+    "3->1": false,
+    "3->2": true
+   }
+  },
+  "concurrency": {
+   "max_running": 15.0,
+   "max_waiting": 13.0,
+   "preemptions": 0.0
+  },
+  "speculation": {
+   "drafts": null,
+   "draft_tokens": null,
+   "accepted": null,
+   "acceptance_rate": null,
+   "mean_acceptance_length": null
+  },
+  "calls": {
+   "calls": 15,
+   "median_rate": 21.754,
+   "rates": [
+    21.748,
+    21.748,
+    21.748,
+    21.748,
+    21.748,
+    21.748,
+    21.748,
+    21.754,
+    21.754,
+    21.754,
+    21.754,
+    21.757,
+    21.758,
+    21.759,
+    21.76
+   ],
+   "degenerate": 0,
+   "errors": 0,
+   "empty": 0,
+   "length_cut": 15
+  },
+  "scores": {
+   "subset": "15 tasks",
+   "hybrid": {
+    "score": 0.0,
+    "tasks": 15,
+    "solved_outputs": 0,
+    "test_outputs": 22
+   },
+   "nvarc": {
+    "score": 0.0,
+    "tasks": 15,
+    "solved_outputs": 0,
+    "test_outputs": 22
+   },
+   "shot": {
+    "score": 0.0,
+    "tasks": 15,
+    "solved_outputs": 0,
+    "test_outputs": 22
+   },
+   "shot_tasks": [
+    "136b0064",
+    "21897d95",
+    "247ef758",
+    "271d71e2",
+    "291dc1e1",
+    "2b83f449",
+    "35ab12c3",
+    "446ef5d2",
+    "4e34c42c",
+    "581f7754",
+    "62593bfd",
+    "88e364bc",
+    "898e7135",
+    "8f215267",
+    "97d7923e"
+   ],
+   "shot_solved": [],
+   "nvarc_solved_on_shot_tasks": [],
+   "gained": [],
+   "lost": [],
+   "net_tasks": 0.0,
+   "waves": [
+    {
+     "wave": 1,
+     "cap": 16384,
+     "tasks": 1,
+     "solved": [],
+     "planned_s": 1660.5,
+     "actual_s": 1016.8
+    },
+    {
+     "wave": 2,
+     "cap": 16384,
+     "tasks": 1,
+     "solved": [],
+     "planned_s": 1679.7,
+     "actual_s": 965.9
+    },
+    {
+     "wave": 3,
+     "cap": 16384,
+     "tasks": 1,
+     "solved": [],
+     "planned_s": 1696.3,
+     "actual_s": 943.3
+    },
+    {
+     "wave": 4,
+     "cap": 16384,
+     "tasks": 1,
+     "solved": [],
+     "planned_s": 1727.2,
+     "actual_s": 979.4
+    },
+    {
+     "wave": 5,
+     "cap": 16384,
+     "tasks": 1,
+     "solved": [],
+     "planned_s": 1742.9,
+     "actual_s": 997.2
+    },
+    {
+     "wave": 6,
+     "cap": 16384,
+     "tasks": 1,
+     "solved": [],
+     "planned_s": 1769.2,
+     "actual_s": 994.4
+    },
+    {
+     "wave": 7,
+     "cap": 16384,
+     "tasks": 1,
+     "solved": [],
+     "planned_s": 1775.0,
+     "actual_s": 956.9
+    },
+    {
+     "wave": 8,
+     "cap": 16384,
+     "tasks": 1,
+     "solved": [],
+     "planned_s": 1798.4,
+     "actual_s": 974.4
+    },
+    {
+     "wave": 9,
+     "cap": 16384,
+     "tasks": 1,
+     "solved": [],
+     "planned_s": 1813.3,
+     "actual_s": 939.5
+    },
+    {
+     "wave": 10,
+     "cap": 16384,
+     "tasks": 1,
+     "solved": [],
+     "planned_s": 1849.9,
+     "actual_s": 1030.4
+    },
+    {
+     "wave": 11,
+     "cap": 16384,
+     "tasks": 1,
+     "solved": [],
+     "planned_s": 1860.1,
+     "actual_s": 985.2
+    },
+    {
+     "wave": 12,
+     "cap": 16384,
+     "tasks": 1,
+     "solved": [],
+     "planned_s": 1875.0,
+     "actual_s": 941.4
+    },
+    {
+     "wave": 13,
+     "cap": 16384,
+     "tasks": 1,
+     "solved": [],
+     "planned_s": 1901.2,
+     "actual_s": 1035.6
+    },
+    {
+     "wave": 14,
+     "cap": 16384,
+     "tasks": 1,
+     "solved": [],
+     "planned_s": 1929.1,
+     "actual_s": 957.2
+    },
+    {
+     "wave": 15,
+     "cap": 16384,
+     "tasks": 1,
+     "solved": [],
+     "planned_s": 1942.4,
+     "actual_s": 973.9
+    }
+   ]
+  }
+ },
+ "mtp": {
+  "name": "shot_mtp",
+  "present": true,
+  "lost": false,
+  "failure": null,
+  "exit_code": 0,
+  "end": "exited",
+  "phases": {
+   "install": 0,
+   "shot": 0
+  },
+  "install_ok": true,
+  "preflight_ok": true,
+  "boot_s": 416.2,
+  "kv_pool": 1507328,
+  "boot_nan_lines": 0,
+  "boot_tracebacks": 0,
+  "sanity_ok": true,
+  "queued": 15,
+  "shot_tasks": 15,
+  "used": 13,
+  "stopped": "no tasks left",
+  "starts": 15,
+  "caps": [
+   16384
+  ],
+  "max_streams_planned": 15,
+  "degenerate": 0,
+  "engine_error": 0,
+  "engine_gone": false,
+  "engine_exit": 0,
+  "valid": true,
+  "log": {
+   "present": true,
+   "lines": 712,
+   "traceback": 1,
+   "error": 8,
+   "nan": 0
+  },
+  "window": {
+   "samples": 1,
+   "seconds": 0.0,
+   "tokens": 0.0,
+   "rate": null,
+   "per_stream": null,
+   "t0": 1146.71,
+   "t1": 1146.71
+  },
+  "samples": 81,
+  "host": {
+   "gpus": [
+    "NVIDIA L4, 610.57.04, 23034 MiB",
+    "NVIDIA L4, 610.57.04, 23034 MiB",
+    "NVIDIA L4, 610.57.04, 23034 MiB",
+    "NVIDIA L4, 610.57.04, 23034 MiB"
+   ],
+   "devices": [
+    {
+     "name": "NVIDIA L4",
+     "capability": "8.9",
+     "memory_bytes": 23689363456
+    },
+    {
+     "name": "NVIDIA L4",
+     "capability": "8.9",
+     "memory_bytes": 23689363456
+    },
+    {
+     "name": "NVIDIA L4",
+     "capability": "8.9",
+     "memory_bytes": 23689363456
+    },
+    {
+     "name": "NVIDIA L4",
+     "capability": "8.9",
+     "memory_bytes": 23689363456
+    }
+   ],
+   "p2p": {
+    "0->1": true,
+    "0->2": false,
+    "0->3": false,
+    "1->0": true,
+    "1->2": false,
+    "1->3": false,
+    "2->0": false,
+    "2->1": false,
+    "2->3": true,
+    "3->0": false,
+    "3->1": false,
+    "3->2": true
+   }
+  },
+  "concurrency": {
+   "max_running": 15.0,
+   "max_waiting": 11.0,
+   "preemptions": 0.0
+  },
+  "speculation": {
+   "drafts": 144253.0,
+   "draft_tokens": 144253.0,
+   "accepted": 125445.0,
+   "acceptance_rate": 0.8696,
+   "mean_acceptance_length": 1.8696
+  },
+  "calls": {
+   "calls": 15,
+   "median_rate": 26.398,
+   "rates": [
+    22.892,
+    23.279,
+    23.751,
+    24.399,
+    24.799,
+    25.603,
+    26.002,
+    26.398,
+    26.84,
+    27.561,
+    28.353,
+    28.625,
+    29.038,
+    29.636,
+    30.705
+   ],
+   "degenerate": 0,
+   "errors": 0,
+   "empty": 0,
+   "length_cut": 15
+  },
+  "scores": {
+   "subset": "15 tasks",
+   "hybrid": {
+    "score": 0.0,
+    "tasks": 15,
+    "solved_outputs": 0,
+    "test_outputs": 22
+   },
+   "nvarc": {
+    "score": 0.0,
+    "tasks": 15,
+    "solved_outputs": 0,
+    "test_outputs": 22
+   },
+   "shot": {
+    "score": 0.0,
+    "tasks": 15,
+    "solved_outputs": 0,
+    "test_outputs": 22
+   },
+   "shot_tasks": [
+    "136b0064",
+    "21897d95",
+    "247ef758",
+    "271d71e2",
+    "291dc1e1",
+    "2b83f449",
+    "35ab12c3",
+    "446ef5d2",
+    "4e34c42c",
+    "581f7754",
+    "62593bfd",
+    "88e364bc",
+    "898e7135",
+    "8f215267",
+    "97d7923e"
+   ],
+   "shot_solved": [],
+   "nvarc_solved_on_shot_tasks": [],
+   "gained": [],
+   "lost": [],
+   "net_tasks": 0.0,
+   "waves": [
+    {
+     "wave": 1,
+     "cap": 16384,
+     "tasks": 1,
+     "solved": [],
+     "planned_s": 1660.5,
+     "actual_s": 732.1
+    },
+    {
+     "wave": 2,
+     "cap": 16384,
+     "tasks": 1,
+     "solved": [],
+     "planned_s": 1679.7,
+     "actual_s": 659.6
+    },
+    {
+     "wave": 3,
+     "cap": 16384,
+     "tasks": 1,
+     "solved": [],
+     "planned_s": 1696.3,
+     "actual_s": 702.0
+    },
+    {
+     "wave": 4,
+     "cap": 16384,
+     "tasks": 1,
+     "solved": [],
+     "planned_s": 1727.2,
+     "actual_s": 727.8
+    },
+    {
+     "wave": 5,
+     "cap": 16384,
+     "tasks": 1,
+     "solved": [],
+     "planned_s": 1742.9,
+     "actual_s": 744.7
+    },
+    {
+     "wave": 6,
+     "cap": 16384,
+     "tasks": 1,
+     "solved": [],
+     "planned_s": 1769.2,
+     "actual_s": 738.8
+    },
+    {
+     "wave": 7,
+     "cap": 16384,
+     "tasks": 1,
+     "solved": [],
+     "planned_s": 1775.0,
+     "actual_s": 688.1
+    },
+    {
+     "wave": 8,
+     "cap": 16384,
+     "tasks": 1,
+     "solved": [],
+     "planned_s": 1798.4,
+     "actual_s": 755.3
+    },
+    {
+     "wave": 9,
+     "cap": 16384,
+     "tasks": 1,
+     "solved": [],
+     "planned_s": 1813.3,
+     "actual_s": 659.5
+    },
+    {
+     "wave": 10,
+     "cap": 16384,
+     "tasks": 1,
+     "solved": [],
+     "planned_s": 1849.9,
+     "actual_s": 801.6
+    },
+    {
+     "wave": 11,
+     "cap": 16384,
+     "tasks": 1,
+     "solved": [],
+     "planned_s": 1860.1,
+     "actual_s": 802.7
+    },
+    {
+     "wave": 12,
+     "cap": 16384,
+     "tasks": 1,
+     "solved": [],
+     "planned_s": 1875.0,
+     "actual_s": 657.1
+    },
+    {
+     "wave": 13,
+     "cap": 16384,
+     "tasks": 1,
+     "solved": [],
+     "planned_s": 1901.2,
+     "actual_s": 795.0
+    },
+    {
+     "wave": 14,
+     "cap": 16384,
+     "tasks": 1,
+     "solved": [],
+     "planned_s": 1929.1,
+     "actual_s": 754.2
+    },
+    {
+     "wave": 15,
+     "cap": 16384,
+     "tasks": 1,
+     "solved": [],
+     "planned_s": 1942.4,
+     "actual_s": 750.4
+    }
+   ]
+  }
+ },
+ "decision": {
+  "row": "Neutral",
+  "reasons": [
+   "a degenerate reply, NaN, or engine error in both steps"
+  ],
+  "q": 1.2135,
+  "q_source": "calls",
+  "q_calls": 1.2135
+ },
+ "kv": {
+  "base": 1746170,
+  "mtp": 1507328,
+  "kaggle_estimate": 1467099,
+  "need": 1606845,
+  "fits": false
+ }
+}

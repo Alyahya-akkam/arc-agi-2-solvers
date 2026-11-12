@@ -1,0 +1,125 @@
+# Submission notebook build for run P6.5-01: the hybrid (task P6.5, ADR-020) measured on DEV40 in
+# development mode at the scored rerun's time per task. The rerun gives 240 hidden tasks 12 h;
+# this run gives 40 tasks the same 12 h scaled by 40/240: NVARC's share and the agent's generation
+# window are a sixth of configs/submission_P6.5-hybrid.yaml's, while the fixed overheads (NVARC's
+# model load and wind-down, its write, the engine's install and boot, the run's final margin, the
+# final check) are not scaled (docs/prerun/P6.5-01.md, section 6, states the distortions). A
+# measurement, not a final pick: its AGENT times apply in a competition rerun too, where they
+# would stop NVARC after an hour and the agent after 2.2 h, so it runs on its own development
+# notebook and MANIFEST.md marks it not for submission. Read by scripts/build_submission.py and
+# scripts/build_kaggle_notebook.py with yaml.safe_load; runbook docs/runbooks/build_submission.md
+# (hybrid build); pre-run brief docs/prerun/P6.5-01.md (draft until the spike's gate).
+
+# Its own development notebook, named by the P6.5-01 brief only: the version this run makes must
+# never be submitted (a sixth of the rerun's times), and submissions come only from
+# alyahya737/arc26-submission.
+kaggle_notebook: alyahya737/arc26-hybrid-dev
+
+# The P6.5 lineage's code dataset, shared with the hybrid's builds (one commit, one wheel).
+code_dataset: alyahya737/arc26-code-p65
+
+# Competition attached: it mounts the data, and only notebooks attached to it get 4xL4.
+competition: arc-prize-2026-arc-agi-2
+
+# 4xL4: NVARC's four workers, then the engine's tensor parallelism 4; the scored rerun's hardware,
+# so the times transfer. No fallback (NvidiaL4X1 is not granted, T4 has no bf16).
+accelerator: NvidiaL4
+
+# Same pinned image and install notebook source as every build (ADR-010).
+reference_metadata: reference/kernel-metadata.json
+
+# Same install notebook version as every build (see configs/submission_P0.5-01.yaml).
+kernel_source_versions:
+  sorokin/pip-install-unsloth-flash-patch: 2
+
+# Same model folder name as every build (K0): NVARC's base model.
+model_slug: qwen3_4b_grids15_sft139
+
+# DEV40 (arc26.data.DEV40, BRIEF B4): 40 tasks, 55 test outputs, 1 task = 2.5 points; P2.6-01
+# scored 10.5 of 40 on them (reports/P2.8/P2.6-01.csv) and missed 29, the tasks of the spike's
+# gate (P6.3-02), so this run reads against both. Quoted so YAML never reads an id as a number.
+subset: [
+  "136b0064", "16de56c4", "195c6913", "20a9e565", "28a6681f", "2ba387bc", "31f7f899",
+  "332f06d7", "3e6067c3", "446ef5d2", "45a5af55", "4a21e3da", "581f7754", "5961cc34",
+  "64efde09", "7b0280bc", "7b5033c1", "7c66cb00", "80a900e0", "8698868d", "89565ca0",
+  "8f3a5a89", "9385bd28", "a25697e4", "b0039139", "b10624e5", "b5ca7ac4", "c7f57c3e",
+  "cbebaa4b", "db0c5428", "db695cfb", "dbff022c", "dd6b8c4b", "de809cff", "dfadab01",
+  "e12f9a14", "e3721c99", "e376de54", "eee78d87", "f560132c",
+]
+
+# One worker per L4, as P2.6-01 and the scored rerun.
+workers: 4
+
+# Same PYTHONHASHSEED as P2.6-01 and every run since run A: one fixed seed for all comparisons.
+hash_seed: 0
+
+# NVARC solves DEV40 until its share, then the agent stage runs.
+run_solver: true
+
+# Seconds after the start: NVARC's soft deadline without the agent, the competition value as in
+# P2.6-01; the share below cuts it to 3,600 s.
+solver_end_s: 41400
+
+# Seconds after the start: NVARC's hard stop without the agent; the share cuts it to 4,200 s.
+solver_kill_s: 42000
+
+# The split solver (ADR-011), Submission 2's NVARC, as the hybrid.
+solver: split
+
+# Submission 2's LoRA scope in both modes (ADR-018), as the hybrid.
+scope:
+  # Rank 16, rsLoRA scale 8, as P2.6-01.
+  lora_r: 16
+  # q, k, v, o; embed_tokens and lm_head frozen, as P2.6-01.
+  lora_targets: [q_proj, k_proj, v_proj, o_proj]
+
+# The hybrid's agent stage (configs/submission_P6.5-hybrid.yaml) at a sixth of its times.
+agent:
+  # On: the stage runs when the agent check passes.
+  enabled: true
+  # NVARC's share: the hybrid's 21,600 s times 40/240. Both are placeholders the spike sets
+  # (P6.3-01's rate, P6.3-02's solves); this run's share follows the hybrid's at the same scale.
+  # With P2.6-01's DEV40 puzzles (489 s on average) replayed on four workers, NVARC finishes about
+  # 24 of the 40 tasks by then, worth about 6.5 of P2.6-01's 10.5 (the rerun: about 173 of 240).
+  nvarc_share_s: 3600
+  # The agent's session end: NVARC's hard stop (3,600 + 600 s), its write (60 s), the install and
+  # the boot (300 and 600 s, the spike's estimates), unscaled, put the engine up near 5,160 s; the
+  # rerun's generation window (about 17,040 s for 240 tasks, 71 s per task) times 40/240 is 2,840
+  # s, so generation stops at 8,000 s; the run config's final margin (1,800 s) puts the end at
+  # 9,800 s.
+  end_s: 9800
+  # SIGTERM to SIGKILL, as the hybrid: the run stops its engine (up to 90 s) and writes once more.
+  term_s: 120
+  # The least time before the generation stop worth an install and a boot, as the hybrid; the
+  # plan leaves 3,500 s even when NVARC runs to its hard stop.
+  min_stage_s: 1800
+  # The offline install's limit, the spike's, as the hybrid.
+  install_timeout_s: 1500
+  # The agent's run config (task P6.4), as the hybrid.
+  config: configs/agent_default.yaml
+  # The weights, as the hybrid.
+  model:
+    # The weights notebook (task P6.3).
+    notebook: alyahya737/arc26-dl-qwen38-int4
+    # Its first run's output.
+    version: 1
+    # The weights' folder in it.
+    folder: qwen38-27b-int4
+    # The verified revision its MANIFEST.json must name.
+    revision: 91bd022d5b49442a868bc35008f6c21e1860edfa
+  # The engine wheelhouse, as the hybrid.
+  wheels:
+    # The wheels notebook (task P6.3).
+    notebook: alyahya737/arc26-dl-agent-wheels
+    # Its first run's output.
+    version: 1
+    # The wheelhouse's folder in it.
+    folder: wheelhouse
+    # The vLLM version its MANIFEST.json must list.
+    vllm: 0.31.0
+  # The image's Python 3.11.13 makes the engine's venv, as the hybrid.
+  base_python: /usr/bin/python3.11
+  # Scratch under /tmp, as the hybrid.
+  scratch_dir: /tmp/arc26-agent
+  # CUDA 13.0's oldest driver, as the hybrid.
+  min_driver: 580.65.06

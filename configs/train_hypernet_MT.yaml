@@ -1,0 +1,232 @@
+# Meta-training of the hypernetwork H at full scale, runs MT-02 (session 1) and MT-03 (session 2,
+# resumed from MT-02's checkpoint) of task MT (BRIEF A7 week 3, B5 P3.5 to P3.7; docs/tasks/MT.md).
+# Read by scripts/train_hypernet.py as configs/train_hypernet.yaml, whose comments give the longer
+# reasons of the shared values; this file differs in the length, the source weights, the 8 encoder
+# views and their cache, validation, and the limits. Pre-run briefs docs/prerun/MT-02.md and
+# MT-03.md; runbook docs/runbooks/train_hypernet.md. One file serves both sessions: a resume must
+# match RESUME_KEYS, and one code dataset version then holds the same bytes for both notebooks.
+
+# Both sessions log under MT-02's id: summary.md points at docs/prerun/MT-02.md, section 1, whose
+# rows cover the end of each session; run.json's start_step and resumed_from tell them apart.
+run_id: MT-02
+
+# P3.4's build is found by its MANIFEST.json under this root; the notebook passes the attached
+# output's mount as --episodes-root.
+episodes_root: /kaggle/input
+
+# Builder v2's manifest, whose leakage check passed (docs/experiments/P3.4.md); any other is
+# refused. MT-01 cached this build's demonstration pairs.
+manifest_sha256: b1f2cd0413efdbe8d00152dd98e76181556907f22477e3079cc07746ad8b7aa8
+
+# The checker's leakage.json for that manifest; the notebook passes its mount as --check-root.
+check_root: /kaggle/input
+
+# P3.4's training pool: 99,674 episodes over 51,048 tasks (BARC 49,680, ReARC 29,997, ARC-AGI-2
+# training 19,997; P3.4 stats), drawn at source_weights' shares below.
+train_split: train
+
+# The 286 validation episodes of 200 held-out puzzles (100 ReARC of 20 held-out generator
+# families, 100 BARC problems), the toy runs' split, so the zero-adapter CE 0.0292 carries over.
+val_split: val
+
+# The notebook's max_seq_length, asserted, never applied: P3.4 dropped the 17 longer episodes, and
+# P3.6-01 measured 8.99 GiB of headroom at 8192 tokens.
+max_tokens: 8192
+
+# The loss covers the <|im_end|> that closes the query's grid (ADR-006 amendment).
+loss_includes_eos: true
+
+# Cache-key part naming the weights and their precision (the Kaggle model handle, K0); MT-01's
+# cache was written under the same id.
+model_id: sorokin/qwen3_4b_grids15_sft139/Transformers/bfloat16/1
+
+# The K0-confirmed model mount, as in configs/train_hypernet.yaml.
+model_dir: /kaggle/input/models/sorokin/qwen3_4b_grids15_sft139/transformers/bfloat16/1
+
+# One GPU per process on NvidiaL4 (T4 has no bf16).
+device: cuda
+
+# The frozen base in the Kaggle bf16 variant (B5 P3.5); H and the delta stay fp32.
+dtype: bfloat16
+
+# FlashAttention 2 when flash_attn imports (the install notebook ships 2.8.2), as P3.6-01 measured.
+attn_implementation: auto
+
+# Non-reentrant activation checkpointing (B5 P3.5); P3.6-01's step times were measured with it.
+gradient_checkpointing: true
+
+# P3.2's encoder at 8 views (ADR-001 amended, P3.2-02: one color permutation per dihedral
+# transform, view seed 2), the set the test-time encoder uses too. MT-01 wrote the cache under
+# exactly these settings (configs/cache_embeddings_MT-01.yaml; a test checks the namespace).
+encoder:
+  # L = 24 of 36 (Q1).
+  layer: 24
+  # Output-grid pooling (Q1).
+  pool: output
+  # 8 views (P3.2-02, Good: every DEV40 task under 10 s; cosine 0.9996 to the 16-view embedding).
+  n_perm: 1
+  # The decode path's augment seed: these 8 views are the first 8 of its 16.
+  view_seed: 2
+  # P3.2's prefill batch, for pairs the cache lacks (none when MT-01 completed).
+  batch_tokens: 16384
+  # Pairs per encode call in the sharded pass, as MT-01's chunks.
+  chunk_pairs: 256
+
+# MT-01's cache, where Kaggle mounted other notebooks' outputs in P3.5-01's session
+# (/kaggle/input/notebooks/<owner>/<slug>, its stages.json); the notebook passes the mount it
+# finds as --embedding-cache, which wins. A wrong path fails at setup (the mount is read-only),
+# never by encoding about 207k pairs again (about 7 h of 4xL4).
+embedding_cache: /kaggle/input/notebooks/alyahya737/arc26-mt-cache/embedding_cache
+
+# H, equal to configs/hypernet.yaml (a test checks it); reasons there.
+hypernet:
+  embed_dim: 2560
+  latent: 512
+  head_in: 384
+  dropout: 0.05
+  rank: 16
+  alpha: 32
+  target_modules: [q_proj, k_proj, v_proj, o_proj]
+  seed: 0
+
+# Four processes, one per L4 of NvidiaL4, as P3.6-01 measured.
+gpus: 4
+
+# B5 P3.5: accumulation 8 (D2L's 8), 32 episodes per optimizer step; P3.6-01 priced this step at
+# 13.42 s on the pool's own mix.
+accum: 8
+
+# What two 41,400 s sessions hold after model load, validation, and checkpoints, at P3.6-01's
+# calibrated 13.42 s per step on the pool's own mix: 5,600 steps cost about 79,000 s of script
+# time (brief MT-02, section 6), 4.6% under the two budgets. These weights' shorter mix projects
+# 11.89 s per step (P3.6-01's model, estimate), so the margin then is about 15% and MT-03 ends
+# early; the length keeps the cosine inside two sessions even if that projection is 13% optimistic
+# (the task brief: no third session). 179,200 draws, 1.8 passes of the pool's size.
+steps: 5600
+
+# D2L's peak lr, warmup, and minimum (research note 1.4), as both toy runs; not tuned here.
+lr: 4.0e-5
+min_lr: 1.0e-7
+warmup_steps: 100
+
+# AdamW as D2L (research note 1.4): decay 0.01 on 2-D weights, betas, epsilon.
+weight_decay: 0.01
+betas: [0.9, 0.999]
+eps: 1.0e-8
+
+# D2L's and T2L's gradient-norm clip (research note 1.4, 2).
+clip: 1.0
+
+# No factor penalty (task brief P3.5: optional, off).
+penalty: none
+penalty_weight: 0.0
+
+# Q6's KL term: off, interface only (BRIEF A7 cut order, item 4).
+kl_weight: 0.0
+
+# One fixed seed for all comparisons (CLAUDE.md).
+seed: 0
+
+# 29 validations (steps 0, 200, ..., 5600) of the 286 episodes: 107 s at step 0 (three references)
+# and 76 s after (P3.5-01, measured), 2,235 s in all, 3.4% of the steps' time (11.89 s each,
+# estimate). It places the best point within 100 steps (1.8% of the run) and measures check C 29
+# times; every 100 steps would cost 4,363 s for 50, every 400 save 1,064 s but miss peaks narrower
+# than the toy runs' (their curves moved up to 1 SE between neighbouring 200-step validations).
+eval_every: 200
+
+# A full checkpoint (H, AdamW, scheduler, cursor, RNG states, history) every 100 steps, about 20
+# minutes of training, the most a lost session costs (the task brief).
+ckpt_every: 100
+
+# The newest two full checkpoints (about 1.6 GB each) for resuming; best.pt (H's weights alone,
+# about 0.54 GB) keeps the best validation point beside them, about 3.8 GB in /kaggle/working.
+keep_checkpoints: 2
+
+# Checkpoints stay on Kaggle; MT-03 attaches MT-02's output and resumes from its latest.json.
+ckpt_dir: /kaggle/working/checkpoints
+
+# Run logs, pulled by kaggle_ops.py.
+out_dir: /kaggle/working/run_logs
+
+# A Kaggle session lasts at most 12 h: checkpoint and stop at 11.5 h (exit 3), leaving the
+# notebook's setup, the last checkpoint, and the logs their time (script_kill_s 42,300 s).
+max_wall_s: 41400
+
+# Kill criteria from P3.6-01's measured step (brief MT-02, section 7); the script enforces them.
+kill:
+  # Twice the slowest legitimate step: all 8 micro steps of one GPU at 8192 tokens, 8 x 9.01 s
+  # less 7 x 0.136 s of DDP, about 72 s calibrated (P3.6-01); the 90th percentile is 15.4 s.
+  max_step_s: 150
+  # Two sessions' budgets, 82,800 s, less the second session's setup (about 480 s, estimate),
+  # rounded down: a projection above it cannot finish in two sessions. With the first session's
+  # setup (about 600 s) it needs a mean step above about 14.0 s, 5% over the pool mix's 13.42 s
+  # and 18% over these weights' 11.89 s.
+  max_projected_s: 82000
+  # The projection's mean over 100 steps of 32 episodes (standard error about 2%: steps spread
+  # from 8.9 s to 15.4 s between the 10th and 90th percentiles, P3.6-01's model).
+  projection_after_steps: 100
+
+# Draw shares (task MT; P3.5-02, Borderline: H's held-out gain came from BARC). At P3.5-02's step
+# 1000, H beat the zero adapter on BARC, 0.0365 against 0.0429 (-15%), and lost on ReARC, 0.0174
+# against 0.0160 (+9%), where the base already fits (zero CE 2.7 times below BARC's; NVARC's SFT
+# used regenerated ReARC, episode note 4.6). So ReARC's share halves (30.1% of the pool to 15%),
+# ARC-AGI-2 training keeps its 20% (the human-written tasks nearest the evaluation; no validation
+# measure to move it on), and BARC takes the rest (49.8% to 65%): 13 : 3 : 4. Over the 179,200
+# draws of 5,600 steps (blocks of 1000 slots, 650 : 150 : 200): BARC 116,485 draws, 2.34 passes
+# over its 49,680 episodes; ReARC 26,884, 0.90 passes over 29,997; ARC-AGI-2 training 35,831,
+# 1.79 passes over 19,997 (the unweighted order: 1.80 passes of each).
+source_weights:
+  arc2train: 0.20
+  barc: 0.65
+  rearc: 0.15
+
+# --smoke runs these settings on the CPU: 2 processes on gloo with accumulation 2, the fixture of
+# tests/testdata/train_hypernet/ (its toy split holds all three sources), and the weights above.
+smoke:
+  # Keeps these outputs apart from the other configs' smokes.
+  run_id: MT-smoke
+  # The fixture build and its synthetic check report (paths from the repository root).
+  episodes_root: tests/testdata/train_hypernet/episode_build
+  manifest_sha256: 15317ba48d7efefab0b37aaa69727454cb3fd71141140a1cd1d018c4013b0550
+  check_root: tests/testdata/train_hypernet/check
+  # The fixture has no train split; its toy split stands in.
+  train_split: toy
+  # The tiny random Qwen3 and the stand-in tokenizer, built in code.
+  model_id: smoke/tiny-random-qwen3
+  model_dir: null
+  # CPU only (BRIEF A0), fp32 for speed and exactness on the CPU, SDPA.
+  device: cpu
+  dtype: float32
+  attn_implementation: sdpa
+  # No cache: the smoke encodes the fixture's pairs itself.
+  embedding_cache: null
+  # Layer 2 of 4; small batches and chunks so the shared encode runs several rounds.
+  encoder:
+    layer: 2
+    batch_tokens: 4096
+    chunk_pairs: 4
+  # H's widths shrunk to the tiny base (hidden 64).
+  hypernet:
+    embed_dim: 64
+    latent: 32
+    head_in: 16
+  # Two gloo processes with accumulation 2: 4 episodes per step.
+  gpus: 2
+  accum: 2
+  # 12 steps of 4 episodes; validation and checkpoints every 4 steps, two full ones kept.
+  steps: 12
+  # A high lr so the memorizable fixture's loss falls within the few steps.
+  lr: 3.0e-3
+  min_lr: 1.0e-4
+  warmup_steps: 2
+  eval_every: 4
+  ckpt_every: 4
+  # Outputs under runs/, which git ignores.
+  ckpt_dir: runs/MT-smoke/checkpoints
+  out_dir: runs/MT-smoke/run_logs
+  # Generous limits for a CPU run of seconds.
+  max_wall_s: 600
+  kill:
+    max_step_s: 60
+    max_projected_s: 600
+    projection_after_steps: 4

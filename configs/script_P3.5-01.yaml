@@ -1,0 +1,66 @@
+# Script notebook build of run P3.5-01, the toy acceptance run of H's meta-training (task P3.5;
+# BRIEF A8, A9). Read by scripts/build_submission.py and scripts/build_kaggle_notebook.py with
+# yaml.safe_load; runbooks docs/runbooks/build_submission.md (script mode) and
+# docs/runbooks/train_hypernet.md; pre-run brief docs/prerun/P3.5-01.md.
+
+# A script config (task P0.5d): the notebook runs one script, never the solver, and is never
+# submitted.
+kind: script
+
+# Its own notebook, <owner>/<slug>, named in the pre-run brief; no CPU push may use it.
+kaggle_notebook: alyahya737/arc26-p3-5-train
+
+# The same private code dataset as every build (ADR-010): a new version made from this build holds
+# the wheel, train_hypernet.py, and train_hypernet_toy.yaml.
+code_dataset: alyahya737/arc26-code
+
+# Same competition as the other builds. The run reads none of its files; the environment check
+# expects the mount, as in every build.
+competition: arc-prize-2026-arc-agi-2
+
+# 4xL4, one training process per GPU (configs/train_hypernet_toy.yaml, gpus 4). bf16 rules out
+# T4, and NvidiaL4X1 ran on 2xT4 when requested (P0.3-01); the bf16 stop refuses such a session.
+accelerator: NvidiaL4
+
+# Same pinned image and model as the other builds: the stack P1.1-01 ran (torch 2.8.0,
+# transformers 4.55.4, flash_attn 2.8.2).
+reference_metadata: reference/kernel-metadata.json
+
+# Same install notebook version as the other builds (configs/submission_P0.5-01.yaml).
+kernel_source_versions:
+  sorokin/pip-install-unsloth-flash-patch: 2
+
+# Same model folder name as the other builds: the environment check finds the base by it.
+model_slug: qwen3_4b_grids15_sft139
+
+# The P3.4 outputs the script trains on, attached at the versions whose leakage check passed
+# (docs/experiments/P3.4.md): the builder's output version 2 holds the episodes with manifest
+# b1f2cd0413efdbe8d00152dd98e76181556907f22477e3079cc07746ad8b7aa8, and the checker's version 2
+# holds run_logs/leakage.json with "pass": true for that manifest. The script refuses any other
+# manifest or report, so a wrong version stops the run in minutes.
+notebook_inputs:
+  alyahya737/arc26-p3-4-episodes: 2
+  alyahya737/arc26-p3-4-leakage: 2
+
+# The training script; it imports only arc26 (the wheel), the image's packages, and the standard
+# library.
+script: scripts/train_hypernet.py
+
+# Its config, P3.5-01's settings with their reasons.
+script_config: configs/train_hypernet_toy.yaml
+
+# The commit for run.json (the dataset copy has no git checkout), and the mount folders of the two
+# P3.4 outputs as the roots the script searches for the build and its check report.
+args:
+  - --commit
+  - "{commit}"
+  - --episodes-root
+  - "{input:alyahya737/arc26-p3-4-episodes}"
+  - --check-root
+  - "{input:alyahya737/arc26-p3-4-leakage}"
+
+# Seconds after the notebook's start: the hard stop. The script stops itself first, at its session
+# budget max_wall_s 15000 s or its projected-wall kill at 14400 s; the 600 s between cover the
+# environment check, the install, and the script's checkpoint and logs. The brief's Timeout is
+# this plus 300 s, 15900 s.
+script_kill_s: 15600

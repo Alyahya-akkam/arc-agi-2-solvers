@@ -1,0 +1,109 @@
+# Submission notebook build for the Kaggle CPU check of the hybrid (task P6.5, task id P6.5-cpu):
+# configs/submission_P6.5-hybrid.yaml's notebook on CPU, NVARC started as the launch probe of
+# configs/submission_cpu_check.yaml, then the agent stage as a probe. It proves on Kaggle, without
+# GPU quota, what can fail without a GPU before the hybrid's GPU runs: where Kaggle mounts the two
+# download outputs and whether their manifests pass the agent check, the offline install of the
+# wheelhouse from the mount on the pinned image, python -m arc26.agent.run with the notebook's
+# command line, an engine that cannot boot (vLLM finds no GPU) leaving NVARC's file, the final
+# check, and run_logs/agent/. Read by scripts/build_submission.py and
+# scripts/build_kaggle_notebook.py with yaml.safe_load; runbook docs/runbooks/build_submission.md
+# (hybrid build). Not fit to submit (no accelerator).
+
+# The CPU check's own notebook, named in no pre-run brief (the gateway refuses CPU pushes to a
+# briefed notebook).
+kaggle_notebook: alyahya737/arc26-submission-cpu-check
+
+# The P6.5 lineage's code dataset: the wheel the hybrid's builds install, from the same commit.
+code_dataset: alyahya737/arc26-code-p65
+
+# Same competition as the GPU builds: it mounts the data the notebook searches for.
+competition: arc-prize-2026-arc-agi-2
+
+# No accelerator: a CPU session spends no GPU quota and needs no pre-run brief (BRIEF A9); the
+# agent check then requires no GPU and no driver, and MANIFEST.md marks the build unfit to submit.
+accelerator: null
+
+# Same pinned image as the GPU builds (ADR-010): the image the wheelhouse was built for.
+reference_metadata: reference/kernel-metadata.json
+
+# Same install notebook version as every build (see configs/submission_P0.5-01.yaml).
+kernel_source_versions:
+  sorokin/pip-install-unsloth-flash-patch: 2
+
+# Same model folder name as every build: the environment check finds NVARC's model by it.
+model_slug: qwen3_4b_grids15_sft139
+
+# One DEV4 task with one test input, as the CPU check: NVARC's probe fails before it reads one,
+# and the agent stage gets one task to load.
+subset: ["aa4ec2a5"]
+
+# One worker, as the CPU check: the probe spawns exactly one process.
+workers: 1
+
+# The project's one fixed seed, as every build.
+hash_seed: 0
+
+# The launch probe: NVARC's solver starts and its worker stops at unsloth for lack of a GPU.
+run_solver: true
+
+# Seconds after the start, the CPU check's: the lowest soft deadline the builder accepts.
+solver_end_s: 600
+
+# Seconds after the start, the CPU check's hard stop.
+solver_kill_s: 660
+
+# The split solver, as the hybrid, so the probe starts python -m arc26.solver.
+solver: split
+
+# The hybrid's scope, so this notebook's cells are the hybrid's (SCOPE_EDITS and HYBRID_EDITS).
+scope:
+  # Rank 16, as the hybrid.
+  lora_r: 16
+  # q, k, v, o, as the hybrid.
+  lora_targets: [q_proj, k_proj, v_proj, o_proj]
+
+# The hybrid's agent stage with the CPU check's times; its inputs and engine are the hybrid's.
+agent:
+  # On: the stage runs as a probe.
+  enabled: true
+  # The lowest share the builder accepts; the probe's own deadlines (600 s, 660 s) are shorter.
+  nvarc_share_s: 600
+  # The agent's end: the lowest the plan allows with P6.4's final_margin_s of 1,800 s (the stage
+  # by 1,500 s, at least min_stage_s before the generation stop at 1,800 s). The probe's engine
+  # fails at its boot within minutes, so the session ends long before.
+  end_s: 3600
+  # SIGTERM to SIGKILL, as the hybrid.
+  term_s: 120
+  # The lowest the builder accepts: the probe needs time for the install, not for generation.
+  min_stage_s: 60
+  # The offline install's limit, as the hybrid: a CPU session has 4 CPUs, as the wheels notebook's
+  # install check had.
+  install_timeout_s: 1500
+  # The agent's run config (task P6.4), as the hybrid.
+  config: configs/agent_default.yaml
+  # The weights, as the hybrid: the check finds and checks the mount; vLLM never loads them on CPU.
+  model:
+    # The weights notebook (task P6.3).
+    notebook: alyahya737/arc26-dl-qwen38-int4
+    # Its first run's output, as the hybrid.
+    version: 1
+    # The weights' folder in it.
+    folder: qwen38-27b-int4
+    # The verified revision its MANIFEST.json must name.
+    revision: 91bd022d5b49442a868bc35008f6c21e1860edfa
+  # The engine wheelhouse, as the hybrid: installed for real, from the mount.
+  wheels:
+    # The wheels notebook (task P6.3).
+    notebook: alyahya737/arc26-dl-agent-wheels
+    # Its first run's output, as the hybrid.
+    version: 1
+    # The wheelhouse's folder in it.
+    folder: wheelhouse
+    # The vLLM version its MANIFEST.json must list.
+    vllm: 0.31.0
+  # The image's Python 3.11.13, as the hybrid.
+  base_python: /usr/bin/python3.11
+  # Scratch under /tmp, as the hybrid.
+  scratch_dir: /tmp/arc26-agent
+  # As the hybrid; a CPU build only records the driver check.
+  min_driver: 580.65.06

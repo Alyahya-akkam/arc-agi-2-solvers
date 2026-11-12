@@ -1,0 +1,124 @@
+# Injection parity on the GPU, run P3.1-01 (task P3.1; BRIEF B5 P3.1, A8, A9; docs/STATE.md
+# conflict 3). Read by scripts/inject_parity.py with yaml.safe_load: every key below is required
+# and no other key is accepted; the smoke section may override any of them. Pre-run brief:
+# docs/prerun/P3.1-01.md. Runbook: docs/runbooks/inject_parity.md. Build:
+# configs/script_P3.1-01.yaml (the script notebook ships this file beside the wheel).
+
+# Run id of the pre-run brief this config serves; parity.json and summary.md carry it.
+run_id: P3.1-01
+
+# Folder searched for the inputs, as the script notebook's environment check searches it: the
+# challenges file and the base model's config.json are found by name, never by a hardcoded mount
+# path (docs/STATE.md, rules for briefs and scripts: the 2026 layout moved within 2026). On
+# another machine pass --input-root, or --model-dir and --challenges.
+input_root: /kaggle/input
+
+# The competition: a challenges file inside a folder of this name is preferred over any other
+# copy (the environment check's rule); equal to configs/script_P3.1-01.yaml's competition.
+competition: arc-prize-2026-arc-agi-2
+
+# The development set's challenges: DEV4's four tasks are in it (arc26.data). Only their train
+# pairs and test inputs are read; a name containing "solution" is refused (BRIEF A0).
+challenges_file: arc-agi_evaluation_challenges.json
+
+# null: the file is found by search under input_root. A path here, or --challenges, skips the
+# search (a machine without the Kaggle layout).
+challenges: null
+
+# The base model's folder name (the Kaggle model's slug): its config.json is found below a folder
+# of this name, as the environment check finds it with configs/script_P3.1-01.yaml's model_slug.
+model_slug: qwen3_4b_grids15_sft139
+
+# null: the model folder is found by search. A path here, or --model-dir, skips the search.
+model_dir: null
+
+# The weights and their precision (the Kaggle model handle, K0), recorded in parity.json.
+model_id: sorokin/qwen3_4b_grids15_sft139/Transformers/bfloat16/1
+
+# B5 P3.1's "DEV4 sequences": the notebook's four dev ids (arc26.data.DEV4), 5 test inputs.
+subset: DEV4
+
+# One L4 of NvidiaL4 (task brief): meta-training runs one episode per GPU (P3.5-01), so one GPU's
+# kernels are the ones that matter. T4 has no bf16; the script refuses a GPU without it.
+device: cuda:0
+
+# The base's precision: bf16, the tier B5 P3.1 bounds. The factors and the delta stay fp32, as
+# PEFT keeps adapters on a bf16 base and inject computes by default (docs/modules/inject.md).
+dtype: bfloat16
+
+# The kernel meta-training uses: FlashAttention 2 when flash_attn imports on a bf16 GPU, else SDPA
+# (arc26.hyper.train.resolve_attention; docs/prerun/P3.5-01.md, section 4). Both paths share it;
+# parity.json records the one used.
+attn_implementation: auto
+
+# The notebook's max_seq_length (arc_solver.worker): the training text is cut to it and each decode
+# prompt to it minus max_new_tokens (931), by the notebook's cut_to_len.
+max_tokens: 8192
+
+# The adapter scope, H's (configs/hypernet.yaml; ADR-002; G2 confirmed by the human on 2 Oct).
+# Script mode ships only this file beside the wheel, so the three values are copied here;
+# tests/test_inject_parity.py fails when they differ from configs/hypernet.yaml.
+scope:
+  # LoRA rank r.
+  rank: 16
+  # LoRA alpha; rsLoRA scale s = alpha / sqrt(r) = 8 (inject.rslora_scaling).
+  alpha: 32
+  # q, k, v, o on every layer: 36 x 4 = 144 projections, 11,796,480 values.
+  target_modules: [q_proj, k_proj, v_proj, o_proj]
+
+# The fixed random adapter: A drawn as PEFT draws a new lora_A, B a seeded normal direction scaled
+# per projection (runbook, section 2).
+adapter:
+  # One fixed seed for all comparisons (CLAUDE.md).
+  seed: 0
+  # ||s B A||_F / ||W||_F for every projection: the delta is about 10% of the projection's output
+  # in RMS, 13 to 26 bf16 ULPs of a typical output element (one ULP is 2^-8 to 2^-7 of it), so
+  # every bf16 rounding of every projection depends on the delta and any kernel difference in the
+  # LoRA path shows. On the tiny smoke model it moves the logits by 0.32 on average and changes a
+  # quarter of the argmaxes (measured, runbook section 3); RMSNorm keeps the logits in range.
+  relative_norm: 0.1
+
+# The decision rule, docs/prerun/P3.1-01.md section 1 (task brief, conflict 3).
+decision:
+  # B5 P3.1's bound on the largest logit difference, injected against PEFT, on every sequence.
+  max_abs_diff: 1.0e-3
+  # Conflict 3's fallback, element by element: the human decides when not every logit is below
+  # the bound, but every argmax agrees and every logit at or above it is at most 2 bf16 ULPs away;
+  # otherwise the run fails. ULPs count only where the bound does not hold: logits near zero have
+  # tiny ULPs, so rounding noise there would read as thousands of them.
+  max_ulp: 2
+  # Non-vacuity: on every sequence the adapter must move PEFT's logits by at least 10 times the
+  # bound on average; below it a PEFT path that ignored the adapter could pass, and the run is an
+  # Error, not a Pass.
+  min_mean_effect: 1.0e-2
+
+# Wall budget, seconds from the script's start: it stops between passes, writes its logs, and
+# exits 3 (Error). The estimate is about 5 minutes (brief, section 6); 1800 s is 6 times that and
+# leaves 600 s before the notebook's hard stop (script_kill_s 2400 in configs/script_P3.1-01.yaml).
+max_wall_s: 1800
+
+# Run logs, relative to the working folder: the script notebook runs the script in
+# /kaggle/working, so this is /kaggle/working/run_logs, which kaggle_ops.py pull brings back to
+# runs/P3.1-01/ (pull allowlist: .json, .jsonl, .md, .yaml, .log).
+out_dir: run_logs
+
+# --smoke: the same code on the CPU. It first writes a synthetic input tree under input_root (the
+# tiny random Qwen3 of tests/test_inject.py saved as a model folder with the stand-in tokenizer,
+# and DEV4-shaped tasks of random grids), then finds and loads it as the GPU run does (BRIEF A8;
+# task brief). These keys replace the ones above; relative paths are from the repository root.
+smoke:
+  # Keeps smoke outputs apart from the GPU run's.
+  run_id: P3.1-smoke
+  # The synthetic input tree, under runs/, which git ignores.
+  input_root: runs/P3.1-smoke/input
+  # The random stand-in weights.
+  model_id: smoke/tiny-random-qwen3
+  # BRIEF A0: no local GPU work.
+  device: cpu
+  # Long enough for the synthetic tasks, short enough that the first task's training text and
+  # decode prompt are cut by cut_to_len (the decode cap is 2048 - 931 = 1117 tokens).
+  max_tokens: 2048
+  # Generous for a CPU run of seconds.
+  max_wall_s: 600
+  # Smoke logs, under runs/.
+  out_dir: runs/P3.1-smoke/run_logs

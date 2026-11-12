@@ -1,0 +1,19 @@
+# V1 reference rank256/nine-target solver with the parity-validated split implementation.
+# H is added explicitly by build_h_submission.py in both development and competition modes.
+kaggle_notebook: alyahya737/arc26-submission
+code_dataset: alyahya737/arc26-code-h-submit
+competition: arc-prize-2026-arc-agi-2
+accelerator: NvidiaL4
+reference_metadata: reference/kernel-metadata.json
+kernel_source_versions:
+  sorokin/pip-install-unsloth-flash-patch: 2
+model_slug: qwen3_4b_grids15_sft139
+subset:
+- 0934a4d8
+- aa4ec2a5
+workers: 4
+hash_seed: 0
+run_solver: true
+solver_end_s: 2400
+solver_kill_s: 3300
+solver: split

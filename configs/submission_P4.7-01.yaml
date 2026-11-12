@@ -1,0 +1,80 @@
+# Submission notebook build for run P4.7-01 (task P4.7, docs/tasks/P4.7.md): one NVARC pass with
+# the reference's LoRA settings (rank 256 on the nine target modules, RunConfig's defaults, as
+# P1.1-01 at d94304d and Submission 1) on the 8 DEV120 tasks where rank 16 leaves outputs without
+# candidates, the cheapest test of the second-pass screen's one positive row
+# (docs/research/second_pass_screen.md on task/ideas e79a1a0: a rank-256 pass on rank 16's
+# confidence-0 tasks, +1.80 tasks of 120 from one rank-256 run). It asks whether P1.1-01's
+# confidence-0 solves come back in a second draw. NVARC only: no scope, no agent stage, no series.
+# A development build for its own notebook, never submitted: MANIFEST.md and the first cell say
+# "Not for submission". Read by scripts/build_submission.py and scripts/build_kaggle_notebook.py
+# with yaml.safe_load; runbook docs/runbooks/build_submission.md ("A rank-256 pass on rank 16's
+# confidence-0 tasks"); pre-run brief docs/prerun/P4.7-01.md.
+
+# A new private notebook for this run only (the task's rule: never arc26-submission, whose
+# versions are the submissions); submission_blocker then marks every build of it a development
+# build, and its brief makes the gateway refuse CPU pushes to it.
+kaggle_notebook: alyahya737/arc26-p4-7-r256
+
+# The P6.9 lineage's code dataset as it is: this branch starts at task/P6.9 5666867 and changes no
+# wheel input (arc26/, pyproject.toml, README.md, .gitignore), so the wheel is a5bb333f byte for
+# byte and the dataset needs no new version (the human, 9 Oct: one code dataset per lineage).
+code_dataset: alyahya737/arc26-code-p69
+
+# Competition attached: it mounts the data (the evaluation challenges and, in development mode,
+# their solutions for the score), and only notebooks attached to it get 4xL4.
+competition: arc-prize-2026-arc-agi-2
+
+# 4xL4: bf16 (compute capability 8.9) for the reference's training, and P1.1-01's hardware, so its
+# per-puzzle seconds size this run. No fallback: NvidiaL4X1 runs on a T4 without bf16.
+accelerator: NvidiaL4
+
+# Same pinned image and install notebook source as every build (ADR-010), P1.1-01's stack.
+reference_metadata: reference/kernel-metadata.json
+
+# Same install notebook version as every build (see configs/submission_P0.5-01.yaml).
+kernel_source_versions:
+  sorokin/pip-install-unsloth-flash-patch: 2
+
+# Same model folder name as every build (K0): NVARC's base model, P1.1-01's.
+model_slug: qwen3_4b_grids15_sft139
+
+# The 8 DEV120 tasks of the task brief (12 test outputs), sorted as the solver's queue sorts them.
+# 65b59efc, 80a900e0, 9385bd28: rank 256's confidence-0 solves in P1.1-01 (+0.5, +1.0, +0.5),
+# whose outputs rank 16 leaves without candidates in all 5 of its passes. 136b0064, 291dc1e1,
+# 581f7754, 6ffbe589, e12f9a14: rank 16 leaves them empty in all 5 passes and rank 256 gave
+# candidates; 291dc1e1 and 581f7754 are the shot's solves in P6.5-03, so they show any overlap.
+# P1.1-01's puzzle seconds on them: 209.5, 214.5, 437.1, 942.0, 254.7, 601.5, 559.6, 825.0
+# (4,043.9 s in all; its session log, the "finished ... in" lines). Development runs only: a
+# competition rerun ignores the subset (arc26/solver.py, the queue's rerun_mode test).
+subset: ["136b0064", "291dc1e1", "581f7754", "65b59efc", "6ffbe589", "80a900e0", "9385bd28", "e12f9a14"]
+
+# One worker per L4, as P1.1-01: each task's TTT and decode run as they ran there.
+workers: 4
+
+# Same PYTHONHASHSEED as P1.1-01 and every run since run A: one fixed seed for all comparisons; it
+# also fixes the 8 rescoring views' seed hash(bk) % 1024**2 to P1.1-01's.
+hash_seed: 0
+
+# The run solves the 8 tasks.
+run_solver: true
+
+# Seconds after the start: the workers' soft deadline, which also stops a DFS in progress
+# (arc26/decode.py line 129). P1.1-01's seconds in the sorted queue on 4 workers end the last
+# puzzle about 1,289 s after the workers start (e12f9a14 starts near 464 s); with the start-up
+# (launch and four model loads, 120 to 400 s, P6.9-02 and P2.0-01) about 1,410 to 1,690 s. 2,700 s
+# also covers the per-puzzle cap's worst case for the last task: a start near 860 s, plus the
+# 1,200 s decode stop (arc26/decode.py line 369), one DFS batch of at most 540 s, and its
+# rescoring, about 2,660 s.
+solver_end_s: 2700
+
+# Seconds after the start: the hard stop, 600 s after the soft deadline as the competition values
+# (12 h minus 30 min, then minus 20 min): the rescoring and pickle writes after a DFS stop take far
+# less. The brief's Timeout adds the write reserve (300 s), the pre-script allowance (2,700 s),
+# and the save.
+solver_kill_s: 3300
+
+# The split solver (ADR-011, the default since 2 Oct): the code every submission since Submission
+# 2 runs and a variant (task P4.7b) would run; the same statements as P1.1-01's moved reference
+# (tests/test_split_solver.py), and P2.0-01 ran it at these LoRA settings on 4xL4 (Pass, per-puzzle
+# totals within 13% of P1.1-01's).
+solver: split

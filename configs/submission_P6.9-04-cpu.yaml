@@ -1,0 +1,167 @@
+# Submission notebook build for the Kaggle CPU check of P6.9-04's build (task P6.9d, task id
+# P6.9-04-cpu): configs/submission_P6.9-03-cpu.yaml (P6.9-03's twin, Good at bff6663) with one
+# change (a test checks it): agent.config names configs/agent_shot_P6.9d.yaml, as
+# configs/submission_P6.9-04.yaml does. It proves on Kaggle, without GPU quota, before the GPU run:
+# everything P6.9-03-cpu proved (the warm-up's copy and checks, the shot given the local copy),
+# and the shot's run config with --speculative-config '{"method": "mtp", "num_speculative_tokens":
+# 1}' in the engine's command and the 69,632 cap in its plan, loaded by the shot's own config
+# loader on Kaggle's image. Read by scripts/build_submission.py and scripts/build_kaggle_notebook.py
+# with yaml.safe_load; runbook docs/runbooks/build_submission.md ("MTP and the 69,632 cap"). Not
+# fit to submit (no accelerator).
+
+# The CPU check's own notebook (P6.5-cpu's), named in no pre-run brief (the gateway refuses CPU
+# pushes to a briefed notebook).
+kaggle_notebook: alyahya737/arc26-submission-cpu-check
+
+# The P6.9 lineage's code dataset (the human, 9 Oct: one code dataset per concurrent build
+# lineage): one commit, one wheel for P6.9-02 to P6.9-04 and their CPU twins.
+code_dataset: alyahya737/arc26-code-p69
+
+# Competition attached: it mounts the data, and only notebooks attached to it get 4xL4.
+competition: arc-prize-2026-arc-agi-2
+
+# No accelerator: a CPU session spends no GPU quota and needs no pre-run brief (BRIEF A9); the
+# agent check then requires no GPU and no driver, and MANIFEST.md marks the build unfit to submit.
+accelerator: null
+
+# Same pinned image and install notebook source as every build (ADR-010); the engine runs from its
+# own venv with the image's PYTHONPATH removed.
+reference_metadata: reference/kernel-metadata.json
+
+# Same install notebook version as every build (see configs/submission_P0.5-01.yaml).
+kernel_source_versions:
+  sorokin/pip-install-unsloth-flash-patch: 2
+
+# Same model folder name as every build (K0): NVARC's base model.
+model_slug: qwen3_4b_grids15_sft139
+
+# One DEV4 task with one test input, as the CPU checks: NVARC's probe fails before it reads one,
+# and the shot gets one task to load.
+subset: ["aa4ec2a5"]
+
+# One worker, as the CPU checks: the probe spawns exactly one process.
+workers: 1
+
+# Same PYTHONHASHSEED as P2.6-01 and every run since run A: one fixed seed for all comparisons.
+hash_seed: 0
+
+# The launch probe: NVARC's solver starts and its worker stops at unsloth for lack of a GPU.
+run_solver: true
+
+# Seconds after the start, the CPU checks': the lowest soft deadline the builder accepts.
+solver_end_s: 600
+
+# Seconds after the start, the CPU checks' hard stop.
+solver_kill_s: 660
+
+# The split solver (ADR-011, the default since 2 Oct), as P2.6-01: Submission 2's NVARC.
+solver: split
+
+# NVARC's LoRA scope in both modes, P2.6-01's (task P2.6, ADR-018): P1.3-01 arm 2 (r16-attn),
+# 38.33 of 120 on DEV120 in P2.6-01 at 499.5 s per puzzle.
+scope:
+  # Rank 16, rsLoRA scale alpha / sqrt(r) = 32 / 4 = 8 (the reference's alpha of 32).
+  lora_r: 16
+  # q, k, v, o on all 36 layers; embed_tokens and lm_head frozen (P1.3-01 arm 2, H's scope).
+  lora_targets: [q_proj, k_proj, v_proj, o_proj]
+
+# The 12 h check's shot stage with the CPU checks' times but a later end (below); its inputs and
+# engine are the check's. The plan: latest start 7,200 - 120 - 60 = 7,020 s; the probe's engine
+# stops in its preparation or preflight within minutes, so the session ends long before.
+agent:
+  # On: the stage runs as a probe.
+  enabled: true
+  # The module the stage runs: P6.3-05's long shot, with arc26.agent.run's arguments and exit
+  # codes (docs/modules/agent_shot.md).
+  entry: arc26.agent.shot
+  # NVARC's deadlines unchanged (design 1: NVARC's marginal task is worth far more than the
+  # shot's): the competition soft deadline, so nvarc_deadlines never shortens them; the builder
+  # requires this value for a shot build.
+  nvarc_share_s: 41400
+  # The shot's end: room for the install on 4 CPUs (188.1 s in P6.5-02-cpu, at most 1,500 s) and
+  # the shot's boot rule, which starts the engine's preparation only with the setup and the
+  # smallest wave left (450 s and, for one task at min_cap 65,536, about 4,760 s: 5,210 s), so the
+  # probe reaches the preparation and the GPU preflight as Submission 3's twin did: from a shot
+  # start by about 1,700 s, the generation stop at 7,080 s leaves 5,380 s. The notebook's end by
+  # 7,200 + 120 + 30 + 300 = 7,650 s, the push's --timeout; the probe itself ends within minutes
+  # of the install.
+  end_s: 7200
+  # Seconds between SIGTERM and SIGKILL of the shot at end_s: on SIGTERM it cancels its calls,
+  # stops its engine (stop_timeout_s 60 s, then SIGKILL and arc26.agent.server's 30 s wait for the
+  # group) and writes once more (under a second), about 95 s with the drain; 120 s covers that. An
+  # engine still alive after SIGKILL is stopped by the notebook through engine.pid (its group).
+  term_s: 120
+  # The lowest the builder accepts: the probe needs time for the install, not for a wave.
+  min_stage_s: 60
+  # The offline install's limit, as the hybrid's CPU check: a CPU session has 4 CPUs, as the
+  # wheels notebook's install check had, and installs slower than P6.3-05's 106 s on 4xL4.
+  install_timeout_s: 1500
+  # P6.9-04's shot config (MTP, one speculative token; max_cap 69,632): the probe checks its
+  # command line, the speculative flag in it, its selection (NVARC's probe leaves placeholders, so
+  # the one task is at confidence 0, the bucket order's last bucket), and its start.
+  config: configs/agent_shot_P6.9d.yaml
+  # The weights' warm-up (task P6.9c), P6.9-03's but delay_s: at the agent check, before NVARC,
+  # a background process copies the 12 files (19,472,990,100 bytes, P6.9-02's agent check) from
+  # their input mount to scratch_dir/weights/qwen38-27b-int4 and checks each at its size and its
+  # sha256 against the output's MANIFEST.json; the engine loads the verified copy, else the input
+  # with the fallback below. In both modes.
+  warmup:
+    # Seconds before the copy starts: none, as no NVARC model loads in a CPU session, so the copy
+    # has the most time to finish before the agent stage reads it (the install ends near 350 s).
+    delay_s: 0
+    # Parallel readers: the 18.6 GB model.safetensors is 70 pieces of 256 MiB, each read in order
+    # through a handle of its own; vLLM's own prefetch reads it with one thread (weight_utils.py,
+    # sorted_files[rank::world_size], 2 files over 4 ranks).
+    workers: 8
+    # MiB per piece: few enough pieces to keep each read long and sequential, enough to keep 8
+    # readers busy to the end.
+    piece_mib: 256
+    # CPU niceness of the copier: the lowest priority, so NVARC's workers and their CPU-side
+    # work keep the CPUs (NVARC's stage time is the check).
+    nice: 19
+    # Seconds between the copier's status writes: about 4 times in each 2-minute stall window.
+    progress_s: 30
+    # GB that must stay free in scratch beside the copy: the engine's venv (about 10 GB), its
+    # caches, and NVARC's copies; P6.9-02's scratch had 1,126 GB free.
+    reserve_gb: 40
+    # Most seconds the agent stage waits, after the install, for a copy still making progress:
+    # the boot limit (configs/agent_shot_P6.9d.yaml, server.boot_timeout_s 900, P6.9's); a
+    # fallback that reads the same bytes from the same mount through fewer readers cannot end
+    # sooner.
+    wait_s: 900
+    # Seconds without a byte copied or hashed after which the copy counts as stalled and the
+    # engine falls back: 4 status writes.
+    stall_s: 120
+    # vLLM 0.31.0's --safetensors-load-strategy for a load from the input mount: the page-cache
+    # prefetch its log line names for a filesystem it does not recognize as network storage
+    # (vllm/model_executor/model_loader/weight_utils.py, lines 1063 to 1116, at db9527a4).
+    fallback_load_strategy: prefetch
+  # The weights: the download notebook's output, as P6.3-05 attached it.
+  model:
+    # The notebook that downloaded and verified RedHatAI/Qwen3.8-27B-INT4 (ADR-020, decision 6).
+    notebook: alyahya737/arc26-dl-qwen38-int4
+    # Its first run's output, P6.3-05's.
+    version: 1
+    # The folder of that output holding the 12 repository files; vLLM loads it from the mount.
+    folder: qwen38-27b-int4
+    # The revision the download verified; its MANIFEST.json must name it.
+    revision: 91bd022d5b49442a868bc35008f6c21e1860edfa
+  # The engine: the wheels notebook's output, as P6.3-05 attached it.
+  wheels:
+    # The notebook that downloaded vLLM 0.31.0 and its closure as wheels for Python 3.11.
+    notebook: alyahya737/arc26-dl-agent-wheels
+    # Its first run's output, P6.3-05's.
+    version: 1
+    # The folder holding the wheels, their MANIFEST.json, and install_wheelhouse.py.
+    folder: wheelhouse
+    # The engine version its MANIFEST.json must list (ADR-020; models note, section 4.1).
+    vllm: 0.31.0
+  # The interpreter that makes the engine's venv: the image's Python 3.11.13, P6.3-05's
+  # (configs/P6.3-05.yaml, wheels.base_python); the kernel's own when missing.
+  base_python: /usr/bin/python3.11
+  # Scratch for the venv (about 10 GB), the engine's caches (configs/agent_shot.yaml, server.env),
+  # NVARC's copies, and the shot's logs: /tmp had about 1.1 TB free in every probe (K0).
+  scratch_dir: /tmp/arc26-agent
+  # The oldest NVIDIA driver for the engine's CUDA 13.0 runtime (torch 2.13 cu130); Kaggle's L4
+  # sessions reported 580.159.04 and 580.178.04.
+  min_driver: 580.65.06

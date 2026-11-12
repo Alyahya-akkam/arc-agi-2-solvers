@@ -1,0 +1,54 @@
+# Script notebook build of run P3.1-01, injection parity on the GPU (task P3.1; BRIEF A8, A9;
+# docs/STATE.md conflict 3). Read by scripts/build_submission.py and
+# scripts/build_kaggle_notebook.py with yaml.safe_load; runbooks docs/runbooks/build_submission.md
+# (script mode) and docs/runbooks/inject_parity.md; pre-run brief docs/prerun/P3.1-01.md.
+
+# A script config (task P0.5d): the notebook runs one script, never the solver, and is never
+# submitted.
+kind: script
+
+# Its own notebook, <owner>/<slug>, named in the pre-run brief (task brief); no CPU push may use it.
+kaggle_notebook: alyahya737/arc26-p3-1-parity
+
+# The same private code dataset as every build (ADR-010): a new version made from this build holds
+# the wheel, inject_parity.py, and inject_parity.yaml.
+code_dataset: alyahya737/arc26-code
+
+# Same competition as the other builds: it mounts the DEV4 challenges the script reads. Equal to
+# configs/inject_parity.yaml's competition, which prefers the copy under this folder.
+competition: arc-prize-2026-arc-agi-2
+
+# 4xL4; the script uses cuda:0, one L4, as meta-training's per-GPU episode does. bf16 rules out
+# T4, and NvidiaL4X1 ran on 2xT4 when requested (P0.3-01); the bf16 stop refuses such a session.
+accelerator: NvidiaL4
+
+# Same pinned image as the other builds: the stack P1.1-01 ran (torch 2.8.0, transformers 4.55.4,
+# peft 0.17.1, flash_attn 2.8.2), the stack P3.5 trains and P4.1 decodes on.
+reference_metadata: reference/kernel-metadata.json
+
+# Same install notebook version as the other builds (configs/submission_P0.5-01.yaml): it provides
+# flash_attn, whose kernel the comparison uses when it imports.
+kernel_source_versions:
+  sorokin/pip-install-unsloth-flash-patch: 2
+
+# Same model folder name as the other builds: the environment check finds the base by it, as the
+# script does with configs/inject_parity.yaml's model_slug.
+model_slug: qwen3_4b_grids15_sft139
+
+# The parity script; it imports only arc26 (the wheel), the image's packages, and the standard
+# library.
+script: scripts/inject_parity.py
+
+# Its config, P3.1-01's settings with their reasons.
+script_config: configs/inject_parity.yaml
+
+# The commit for parity.json (the dataset copy has no git checkout). The script finds the model
+# and the challenges by search under /kaggle/input itself, so nothing else is passed.
+args:
+  - --commit
+  - "{commit}"
+
+# Seconds after the notebook's start: the hard stop. The script stops itself first, at its wall
+# budget max_wall_s 1800 s; the 600 s between cover the environment check and the install (about
+# a minute each, P0.5-cpu) and the script's logs. The brief's Timeout is this plus 300 s, 2700 s.
+script_kill_s: 2400

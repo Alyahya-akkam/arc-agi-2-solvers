@@ -1,0 +1,278 @@
+# The agent solver's run config (task P6.4, ADR-020): the scheduler's phases and governor, the
+# sandbox limits, the engine client, and the vLLM server. Read by arc26/agent/run.py
+# (config_from_mapping) with yaml.safe_load: every key below is required and no other key is
+# accepted. Module doc: docs/modules/agent_run.md. Sources: "design note" is
+# docs/research/agent_library_design.md, "models note" docs/research/qwen38_and_small_models.md,
+# "spike" the GPU spike's configs on task/P6.3b (configs/P6.3-01.yaml, configs/P6.3-02.yaml).
+# The budgets and the rate prior are the design note's targets (section 5.5); reset them from
+# P6.3-01's measured rate and P6.3-02's solves before the scored run.
+
+# The project's one fixed seed (CLAUDE.md): each attempt's sampling seed derives from it and the
+# attempt id (arc26.agent.loop.attempt_seed).
+seed: 0
+
+# One global deadline (seconds). The session ends at --deadline (Unix time), or session_s after
+# --session-start (Unix time, the notebook's start); competition mode requires one of the two,
+# since the run starts after NVARC's stage. Development mode may give --budget-s (the end, seconds
+# from now) or nothing (the end is session_s - startup_margin_s from the process's start).
+# Generation stops final_margin_s before the end.
+deadline:
+  # Kaggle's limit for a code competition notebook: 12 hours.
+  session_s: 43200
+  # Development mode's default only: the session's time assumed gone before this process starts
+  # (the notebook's checks and the offline vLLM install, which the spike allows 1,500 s,
+  # configs/P6.3-01.yaml wheels.timeout_s), rounded up. The engine's boot happens inside the run
+  # and counts against the deadline itself.
+  startup_margin_s: 1800
+  # Kept after generation: stopping the engine (up to 60 s) and the sandboxes, the final write
+  # (seconds), and slack for a scored rerun slower than measured: generation stops 11.5 h into
+  # the session, 30 minutes before Kaggle's limit (the design note planned with 11 h, section 5.5;
+  # 3600 here restores that).
+  final_margin_s: 1800
+  # Seconds attempts may run past the deadline before they are cancelled: an attempt stops at its
+  # next engine call on its own; a REPL cell (10 s) or a verification (2 s per call) still in
+  # flight finishes well within this.
+  grace_s: 60
+
+# Attempts in flight at once against the one engine: the design's band (16 to 64, section 5.1)
+# and the spike's stage 2 value; the throughput cells measure 32 at an 8k and a 32k context.
+concurrency: 32
+
+# P6.1's sandbox limits (docs/modules/agent_sandbox.md).
+sandbox:
+  # Verifier processes: 16 checks at once for 32 attempts that each verify a few programs a
+  # minute (the spike's value); the 4xL4 host has 48 CPUs (MT-01), each REPL takes one more.
+  verifier_workers: 16
+  # Seconds per transform call in the verifier: P6.1's default, ample for numpy on 30x30 grids.
+  call_timeout_s: 2.0
+  # Address-space limit of every REPL and program process in MiB: P6.1's default (2 GiB); 32 REPLs
+  # and 16 workers stay far under the host's 173 GiB.
+  memory_mb: 2048
+  # Seconds per REPL cell: P6.2's default, the design note's figure (section 5.1).
+  cell_timeout_s: 10.0
+  # Code blocks run per reply: P6.2's default; later blocks are reported as skipped.
+  max_cells: 4
+  # Characters of one feedback message's body: P6.2's default (about 1,500 tokens).
+  feedback_chars: 6000
+
+# The governor: each attempt's budget is share * rate_safety * rate * seconds left / tasks left,
+# within its phase's floor and cap (docs/modules/agent_run.md).
+governor:
+  # Aggregate generated tokens per second assumed until the window holds min_calls calls:
+  # participants' reports for Qwen3.8-27B on 4x L4 (350 to 450, models note 5.1; design note 5.5
+  # plans with 400). Replace it with P6.3-01's measured rate at 32 requests.
+  prior_rate: 400
+  # The measuring window in seconds. Phase 2 to 4 calls take up to tens of minutes (32,768
+  # tokens at about 12 tokens per second per stream with 32 in flight is 45 minutes), so an hour
+  # holds dozens of them; each call's tokens count by its overlap with the window, and the calls
+  # in flight count their time at the completed calls' rate per call-second, so a burst of
+  # completions does not swing the estimate (docs/modules/agent_run.md, Governor).
+  window_s: 3600
+  # Completed calls that must overlap the window for a new measurement: one per 4 slots, so the
+  # first few quick replies alone do not set the rate. With fewer (start-up, an engine restart),
+  # the last measured rate stays, and the prior before any measurement.
+  min_calls: 8
+  # Share of the measured rate the budgets plan on: a phase's last attempts run below full
+  # concurrency, an engine restart costs minutes, and the deadline cuts attempts mid-call.
+  rate_safety: 0.9
+
+# The scheduler's rules (arc26/agent/scheduler.py).
+scheduler:
+  # Extra attempts per task and phase after an engine error (a crash, a restart, a dropped
+  # request): one, so a restart loses no task, and a task the engine always fails on costs at
+  # most two calls.
+  engine_error_retries: 1
+  # Phase 4 (no attempt limit) instead drops a task only after this many consecutive rounds (one
+  # attempt of the task each) end with an engine error: errors hours apart (a restart, a dropped
+  # request) never add up, while a task the engine fails on every time stops costing calls.
+  cycle_error_rounds: 2
+  # Phase 3 takes an unsolved task when a failed program reproduced at least this many
+  # demonstrations ("some demonstrations reproduced", the brief).
+  min_pairs_passed: 1
+  # No reply is requested with less room than this many tokens: P6.2's default; a thinking reply
+  # needs room to reach its code.
+  min_turn_tokens: 256
+  # Views NVARC decodes per test input, the denominator of its agreement (ADR-014: 16).
+  nvarc_views: 16
+  # Earlier failed programs shown to a later attempt, best last: P6.2's prompt shows at most 2
+  # (prompts.MAX_PRIOR), the design note's figure (section 5.2).
+  prior_programs: 2
+  # Characters of one shown program with its report: P6.2 clips the report to 3,000, so the
+  # program keeps 3,000 (head and tail around a cut marker). Two programs then add at most about
+  # 12,000 characters, which leaves a 65,536-token context ample room; uncapped, two programs of
+  # 30,000 characters left no room for a reply.
+  prior_chars: 6000
+
+# The phases (design note 5.4 and 5.5; the spike's stage 2 phases). Tokens count generated
+# tokens, reasoning included. max_attempt_tokens caps a task's attempt; min_attempt_tokens is
+# its floor when tokens are scarce; share is the part of the remaining tokens a phase plans on.
+# attempts: phase 1 runs them on every task, solved or not (more than 1 gives independent votes,
+# whose disagreements phases 3 and 4 take up); phase 2 stops once a task is solved; phases 3 and
+# 4 run them while a task stays eligible; 0 turns a phase off; null (the last phase only) means
+# no limit.
+phases:
+  # Phase 1, every task, easiest first: one short attempt at low effort (22.8% on ARC-AGI-2 at
+  # low effort for about 93k tokens per task, models note 5.2), up to 2 feedback rounds (3 turns),
+  # at most 16,384 tokens per turn and 24,000 in all (design note 5.5: 12k to 24k). Floor 8,000:
+  # one low-effort turn with its code. Share 0.5: when tokens are scarce, phase 1 plans on at
+  # most half of them so that phase 2 keeps time. No prior: there is nothing earlier.
+  - attempts: 1
+    min_attempt_tokens: 8000
+    max_attempt_tokens: 24000
+    turn_tokens: 16384
+    max_turns: 3
+    reasoning_effort: low
+    temperature: 1.0
+    share: 0.5
+    preserve_thinking: false
+    prior: false
+  # Phase 2, the unsolved tasks, NVARC's least confident first: one long attempt at xhigh (42.4%
+  # at xhigh, models note 2.1), up to 5 turns, 32,768 tokens per turn, at most 65,536 in all
+  # (design note 5.5: 40k to 60k; the context is 65,536). Floor 16,000: one xhigh turn of useful
+  # length. It sees the task's best failed programs (prior). Share 1: phase 3 only gets what is
+  # left, by design.
+  - attempts: 1
+    min_attempt_tokens: 16000
+    max_attempt_tokens: 65536
+    turn_tokens: 32768
+    max_turns: 5
+    reasoning_effort: xhigh
+    temperature: 1.0
+    share: 1.0
+    preserve_thinking: false
+    prior: true
+  # Phase 3, while time remains: tasks with partial progress, then tasks whose verified programs
+  # disagree; up to 2 more attempts each at xhigh, up to 100,000 tokens (design note 5.5: about
+  # 100k per frontier task at 400 tokens/s). Partial-progress tasks see their best failed
+  # programs; a task with verified programs gets an independent attempt (no prior).
+  - attempts: 2
+    min_attempt_tokens: 16000
+    max_attempt_tokens: 100000
+    turn_tokens: 32768
+    max_turns: 5
+    reasoning_effort: xhigh
+    temperature: 1.0
+    share: 1.0
+    preserve_thinking: false
+    prior: true
+  # Phase 4, until the generation stop, so no time is left unused: fresh attempts (new seeds) on
+  # the unsolved tasks, then on tasks whose verified programs disagree, round robin by fewest
+  # attempts so far. No limit per task; the budget spreads the time left over the tasks in the
+  # cycle, capped at one phase-2-sized attempt (65,536) so the cycle keeps turning. Unsolved tasks
+  # see their best failed programs; solved ones get an independent attempt.
+  - attempts: null
+    min_attempt_tokens: 16000
+    max_attempt_tokens: 65536
+    turn_tokens: 32768
+    max_turns: 5
+    reasoning_effort: xhigh
+    temperature: 1.0
+    share: 1.0
+    preserve_thinking: false
+    prior: true
+
+# P6.2's engine client (arc26/agent/engine.py, EngineConfig); the model name and the URL come
+# from the server section, and max_connections is the concurrency.
+engine:
+  # The effort as a top-level request field: the model card's way; vLLM 0.31 forwards it into
+  # the chat template (docs/modules/agent_loop.md, Engine).
+  effort_transport: request
+  # The thinking switch: null keeps the template's default (on), which every phase needs.
+  thinking: null
+  # Seconds to open a connection to the local server.
+  connect_timeout_s: 10.0
+  # Retries after a connection failure (a server restarting, a dropped request), with backoff:
+  # about 30 s in all before the attempt ends with an engine error and is run again later.
+  max_retries: 5
+  # The first retry's delay in seconds; it doubles per retry.
+  backoff_s: 1.0
+  # The cap on one retry's delay in seconds.
+  backoff_max_s: 30.0
+
+# vLLM's server: `vllm serve <model dir>` from the engine venv. The flags equal the spike's stage 1
+# and 2 server sections (configs/P6.3-01.yaml, checked against the vLLM 0.31.0 sources on 9 Oct);
+# their reasons are repeated here in short.
+server:
+  # Local only: the client runs in the same session.
+  host: 127.0.0.1
+  # vLLM's default port.
+  port: 8000
+  # The name requests use; any string works.
+  served_model_name: qwen38-27b-int4
+  # All four L4s in one replica: the 4 KV heads allow 1, 2, or 4, and one TP4 replica beats two
+  # TP2 replicas by not duplicating the weights (models note 5.2).
+  tensor_parallel_size: 4
+  # FP8 KV cache: half the memory of BF16 KV, about twice the sequences (models note 1, 5.2).
+  kv_cache_dtype: fp8
+  # Prefix caching on: each conversation is resent every turn (design note 5.2); the NaN bug
+  # #55766 needs speculation, which is off.
+  enable_prefix_caching: true
+  # Context limit per request: long attempts reach 40k to 60k tokens (design note 5.5); also the
+  # bound the loop keeps every prompt and reply under.
+  max_model_len: 65536
+  # Concurrent sequences: room for the 32 attempts and the spike's top concurrency (64); vLLM's
+  # default (1024) exceeded the state slots of hybrid models at graph capture (models note 4.3).
+  max_num_seqs: 64
+  # Prompt tokens per scheduler step (chunked prefill): large GEMMs, bounded activations.
+  max_num_batched_tokens: 8192
+  # Share of each L4's memory vLLM may use: about 2.3 GB per GPU left for the CUDA context, NCCL,
+  # and the sampler.
+  gpu_memory_utilization: 0.90
+  # Triton attention: takes an FP8 KV cache on sm_89 and needs no FlashInfer JIT (models note 4.1).
+  attention_backend: TRITON_ATTN
+  # Text only: the vision tower (about 0.9 GB BF16) is never loaded.
+  language_model_only: true
+  # Splits the thinking from the answer (the model card's serving command).
+  reasoning_parser: qwen3
+  # Default sampling from the checkpoint's generation_config.json (temperature 1.0, top_p 0.95,
+  # top_k 20: the card's thinking settings).
+  generation_config: auto
+  # No other flag: no speculative decoding (MTP collapses the batch on 24 GB cards, #55533;
+  # speculation with prefix caching gives NaN logits, #55766).
+  extra_args: []
+  # Engine environment, added to the image's with PYTHONPATH and PIP_* removed.
+  env:
+    # The PyTorch top-k and top-p sampler: no FlashInfer JIT (no CUDA 13 nvcc in the image).
+    VLLM_USE_FLASHINFER_SAMPLER: "0"
+    # vLLM's own startup limit, above its 600 s default: loading 19.5 GB, compiling, and graph
+    # capture may pass it on a first boot; boot_timeout_s below is the run's limit.
+    VLLM_ENGINE_READY_TIMEOUT_S: "1800"
+    # Caches on scratch, never in the notebook's output.
+    VLLM_CACHE_ROOT: /tmp/arc26-agent/vllm-cache
+    # Hugging Face caches on scratch.
+    HF_HOME: /tmp/arc26-agent/hf-home
+    # The session has no internet: no Hub lookups.
+    HF_HUB_OFFLINE: "1"
+    # Same, for transformers.
+    TRANSFORMERS_OFFLINE: "1"
+    # No usage reporting attempts in an offline session.
+    VLLM_NO_USAGE_STATS: "1"
+    # Same, for the libraries that read it.
+    DO_NOT_TRACK: "1"
+    # Triton's compile cache on scratch.
+    TRITON_CACHE_DIR: /tmp/arc26-agent/triton-cache
+    # Inductor's compile cache on scratch.
+    TORCHINDUCTOR_CACHE_DIR: /tmp/arc26-agent/inductor-cache
+  # Removed from the engine's environment: an image ptxas for CUDA 12 would assemble Triton 3.7's
+  # newer PTX; Triton uses its bundled tools without these.
+  unset_env: [TRITON_PTXAS_PATH, TRITON_CUOBJDUMP_PATH, TRITON_NVDISASM_PATH]
+  # Seconds until /health must answer: the first boot loads and compiles everything (estimate 5
+  # to 15 minutes); a timeout is not retried, a crash during the boot is (restarts below).
+  boot_timeout_s: 1800
+  # Seconds between SIGTERM and SIGKILL of the engine's process group.
+  stop_timeout_s: 60
+  # Seconds between health probes during a boot.
+  health_interval_s: 2.0
+  # Seconds between the supervisor's checks during the run (process alive, /health).
+  monitor_interval_s: 5.0
+  # Seconds without a healthy answer, the process alive, before the engine counts as hung and is
+  # restarted: far above any /health delay of a loaded server, short against 11 hours.
+  hang_s: 600
+  # Restarts after a crash or a hang (the brief: restart once); a second failure leaves NVARC's
+  # attempts in the submission.
+  restarts: 1
+
+logs:
+  # Every conversation, replies with their reasoning, to transcripts.jsonl in development mode
+  # (the spike's analysis needs them); competition mode never writes them.
+  dev_transcripts: true

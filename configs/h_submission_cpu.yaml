@@ -1,0 +1,18 @@
+# Free CPU twin: validates offline install and H source; no model solving on CPU.
+kaggle_notebook: alyahya737/arc26-h-submit-cpu
+code_dataset: alyahya737/arc26-code-h-submit
+competition: arc-prize-2026-arc-agi-2
+accelerator: null
+reference_metadata: reference/kernel-metadata.json
+kernel_source_versions:
+  sorokin/pip-install-unsloth-flash-patch: 2
+model_slug: qwen3_4b_grids15_sft139
+subset:
+- 0934a4d8
+- aa4ec2a5
+workers: 4
+hash_seed: 0
+run_solver: false
+solver_end_s: 2400
+solver_kill_s: 3300
+solver: split

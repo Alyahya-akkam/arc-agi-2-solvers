@@ -1,0 +1,57 @@
+# Free CPU twin compiles actual offline xgrammar and exercises fake HTTP plumbing.
+extends: configs/P5.8-03.yaml
+run_id: P5.8-03-cpu
+kernel:
+  id: alyahya737/arc26-p58-schema-cpu
+  title: arc26 p58 schema cpu
+  accelerator: null
+  timeout_s: 9400
+mode: development
+time_plan:
+  development:
+    generation_stop_s: 8200
+    end_s: 8500
+    min_start_s: 1
+precache:
+  enabled: false
+engine:
+  module: null
+  script: fn_fake_sglang.py
+  boot_timeout_s: 600
+  poll_s: 1
+  boot_retry_flags: null
+  boot_ladder: null
+  flags:
+    --port: '{port}'
+    --model-path: '{model}'
+    --tokenizer-dir: '{model}'
+    --max-running-requests: 7
+    --think-tokens: 300
+    --fake-pool: 400000
+    --incremental-streaming-output: true
+    --stream-interval: 16
+    --tool-calls: 1
+arg_check:
+  drop_flags:
+  - --tokenizer-dir
+  - --think-tokens
+  - --fake-pool
+  - --tool-calls
+  retry_flags:
+    --kv-cache-dtype: bfloat16
+    --cuda-graph-backend-decode: disabled
+    --cuda-graph-backend-prefill: disabled
+stress:
+  max_new: 64
+solve:
+  dev_arms:
+  - plain
+  - tool
+  task_ids:
+  - 97d7923e
+  - 247ef758
+  - 7b3084d4
+  cap: 2048
+  forcing_tokens: 1024
+  max_streams: 6
+  request_timeout_s: 600

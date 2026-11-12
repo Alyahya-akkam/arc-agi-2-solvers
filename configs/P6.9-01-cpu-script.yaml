@@ -1,0 +1,75 @@
+# Kaggle CPU check of run P6.9-01 (task P6.9) before its GPU run, as
+# configs/P6.3-06-cpu-script.yaml is P6.3-06's (equal to it but for script_config and comments):
+# this notebook runs the GPU build's code dataset files (the wheel, scripts/agent_spike.py,
+# configs/P6.9-01.yaml) in the same pinned image with the same install notebook, on CPU:
+# agent_spike.py --smoke runs the harness preflight on DEV40's smallest task, the fake engine's
+# sanity request and forcing check, the budget check, and the shot with P6.2's ScriptedEngine on
+# the fixtures and DEV4 (one sample per task, the two-answer prompt, a reply whose reasoning the
+# engine cuts at the thinking budget with the answer in the same reply, a task solved by its
+# second attempt, a task whose answer only the lenient parser reads). No GPU quota and no pre-run
+# brief (BRIEF A9). Read by scripts/build_submission.py and scripts/build_kaggle_notebook.py with
+# yaml.safe_load; runbooks docs/runbooks/build_submission.md (script mode) and
+# docs/runbooks/agent_spike.md.
+
+# A script config: the notebook runs one script, never the solver, and is never submitted.
+kind: script
+
+# Its own notebook, named by no pre-run brief: the gateway refuses CPU pushes to a briefed
+# notebook, since Kaggle may keep a slug's previous accelerator.
+kaggle_notebook: alyahya737/arc26-p6-3-shot-cpu
+
+# The GPU build's code dataset: at the same commit this build's arc26-code/ folder is
+# byte-identical to dist/P6.9-01/arc26-code/ (same wheel, script, config, and metadata), so one
+# dataset version serves this check and then the GPU run (one build lineage, run in sequence).
+code_dataset: alyahya737/arc26-code-p6-route
+
+# The competition: DEV40's and DEV4's evaluation challenges, found under /kaggle/input.
+competition: arc-prize-2026-arc-agi-2
+
+# No accelerator: the smoke needs no GPU (a CPU session spends no GPU quota, and the bf16 stop
+# does not apply).
+accelerator: null
+
+# The pinned image of the GPU run (Python 3.11.13): the interpreter, site folder, and
+# sitecustomize the sandbox processes met in run P6.3-02.
+reference_metadata: reference/kernel-metadata.json
+
+# The GPU run's install notebook version: its folder is on the import path of the run's
+# processes (run P6.3-02's env.json), which is part of the layout under test.
+kernel_source_versions:
+  sorokin/pip-install-unsloth-flash-patch: 2
+
+# Same model folder name as every build: the environment check finds the attached base model by
+# it. The smoke does not load it.
+model_slug: qwen3_4b_grids15_sft139
+
+# No notebook_inputs: the smoke reads neither the INT4 weights nor the wheelhouse, and neither is
+# on the import path (run P6.3-02's env.json), so leaving out their 23 GB changes nothing the
+# check tests.
+
+# The spike, with run P6.9-01's config: the GPU run's settings, which --smoke shrinks to fixture
+# size (smoke_overrides).
+script: scripts/agent_spike.py
+
+# The GPU run's own config, so the dataset holds one config for both notebooks.
+script_config: configs/P6.9-01.yaml
+
+# The commit for run.json; the smoke path; its outputs where the pull finds them; its scratch
+# outside them; the input root under which the competition's files are found.
+args:
+  - --commit
+  - "{commit}"
+  - --smoke
+  - --out-dir
+  - /kaggle/working/run_logs
+  - --scratch-dir
+  - /tmp/agent-spike-shot-cpu
+  - --input-root
+  - /kaggle/input
+
+# Seconds after the notebook's start: the hard stop. The environment check and the install took
+# 113.5 s in run P6.3-02 (65.0 and 48.4), the smoke stops itself at its max_wall_s of 300 s
+# (smoke_overrides), and the local smoke takes about 3 s; 900 s leaves room for a slow mount.
+# The push's Timeout is 1800 s (build_submission.py's CPU minimum), 600 s more than this plus
+# the 300 s the logs need.
+script_kill_s: 900

@@ -1,0 +1,147 @@
+# The 8-view embedding cache of every distinct demonstration pair of P3.4's training and validation
+# episodes, run MT-01 of task MT (docs/tasks/MT.md; BRIEF B2 Q1, B5 P3.2 and P3.5, A8). Read by
+# scripts/cache_embeddings.py in episode mode (this file has an episodes section): every key below
+# is required and no other key is accepted. Pre-run brief docs/prerun/MT-01.md; runbook
+# docs/runbooks/cache_embeddings.md. On Kaggle the script notebook configs/script_MT-01.yaml runs
+# it; MT-02 attaches its output and reads the cache (configs/train_hypernet_MT.yaml).
+
+# Run id of the pre-run brief this config serves; run.json and summary.md carry it.
+run_id: MT-01
+
+# The weights and their precision: part of the cache key, so MT-02, which reads the cache under
+# the same id, gets embeddings of the weights it trains on; it also names the folder searched.
+model_id: sorokin/qwen3_4b_grids15_sft139/Transformers/bfloat16/1
+
+# Root searched for the model folder (the mounts moved within 2026; docs/STATE.md, rules for
+# scripts), as P3.2-01 and P3.2-02 found it.
+input_root: /kaggle/input
+
+# Base model folder; null finds it under input_root by the end of its path (model_id's model,
+# framework, variation, and version).
+model_dir: null
+
+# One process per GPU: rank k runs on cuda:k (episode mode names the device kind only).
+device: cuda
+
+# bf16, the Kaggle model variant, the precision P3.2-02 measured and MT-02 trains in.
+dtype: bfloat16
+
+# SDPA, as P3.2-02: its time was linear in tokens, so FlashAttention 2 had no attention term to
+# remove (docs/experiments/P3.2-01.md); the cached embeddings then come from the measured encoder.
+attn_implementation: sdpa
+
+# L = 24 of 36 (BRIEF B2 Q1, ADR-001); MT-02's encoder settings must equal these (a test checks).
+layer: 24
+
+# Output-grid pooling (Q1).
+pool: output
+
+# 8 views, one color permutation per dihedral transform (ADR-001 amended, P3.2-02: Good), the
+# set training and the test-time encoder use.
+n_perm: 1
+
+# The decode path's augment seed: the 8 views are the first 8 of its 16.
+view_seed: 2
+
+# Padded tokens per prefill batch, as P3.2-02 (peak 8.70 GB of an L4's 22 GB).
+batch_tokens: 16384
+
+# Means only: per-view rows would make each entry 9 times larger, about 19 GB for about 207k
+# pairs instead of about 2.1 GB, over Kaggle's about 20 GB of working output (runbook, section 3).
+store_views: false
+
+# Pairs per cache shard when the parent merges the part files: one index rewrite per 4,096 pairs
+# (about 50 rewrites in all) and shards of about 42 MB; part files bound what a cut session loses.
+flush_pairs: 4096
+
+# No chunk starts after 40,800 s (11.33 h) from the script's start. The estimate is 7.1 to 8.4 h
+# (brief MT-01, section 6), so this stops only a run about 35% slower than its upper estimate; the
+# 1,500 s left before the notebook's hard stop (script_kill_s 42,300 s from the notebook's start,
+# the script starting about 150 s in) cover the chunks in flight (about 130 s each, estimate), the
+# last merge, the check (a model load and 256 pairs, about 4 minutes), and the logs.
+max_wall_s: 40800
+
+# Cache root; the namespace folder inside it is named by the encoder settings above. It stays on
+# Kaggle as the notebook's output, which MT-02 attaches.
+cache_dir: /kaggle/working/embedding_cache
+
+# Run logs: kaggle_ops.py pull brings /kaggle/working/run_logs back to runs/MT-01/.
+out_dir: /kaggle/working/run_logs
+
+# The episodes whose demonstration pairs are cached: P3.4 build 2 and its leakage report, found
+# by the manifest's sha256 under the roots (the notebook passes both mounts on the command line),
+# verified as training verifies them (arc26.hyper.train.open_episode_set and load_split).
+episodes:
+  # Searched for the build's MANIFEST.json; --episodes-root names the attached output.
+  root: /kaggle/input
+  # Builder v2's manifest, whose leakage check passed (docs/experiments/P3.4.md), MT-02's.
+  manifest_sha256: b1f2cd0413efdbe8d00152dd98e76181556907f22477e3079cc07746ad8b7aa8
+  # Searched for that manifest's leakage.json; --check-root names the checker's output.
+  check_root: /kaggle/input
+  # The splits MT-02 reads z_bar for: 99,674 training and 286 validation episodes.
+  splits: [train, val]
+  # The build's cap, asserted by load_split (the notebook's 8192).
+  max_tokens: 8192
+
+# The four L4s of NvidiaL4, one process each: the encode is about 28 to 33 GPU-hours (estimate),
+# 7 to 8 h of session on four GPUs, more than one 12 h session on one.
+gpus: 4
+
+# Pairs per encode call and per part file: 2,048 prefills per call, so P3.2-01's fixed cost per
+# call (0.54 s) is paid about 810 times instead of once per task (51,048 tasks, about 7.6 GPU-hours,
+# estimate); a cut session loses at most one chunk per process, about 130 s of work.
+chunk_pairs: 256
+
+# A first session starts from an empty cache. A continuation notebook passes the earlier
+# session's mounted cache with --seed-cache (runbook, section 4).
+seed_cache: null
+
+# Cached pairs the check re-encodes at the end: enough to catch an index or merge error, which
+# would touch every pair, for about 4 minutes of one L4 (estimate).
+verify_pairs: 256
+
+# The check's bound on the cosine of each re-encoded pair with its cache entry: batch composition
+# moves a bf16 embedding far less than the 8-to-16-view change (cosine 0.9983 at worst, P3.2-02),
+# while two different pairs sit at a median cosine of 0.55.
+verify_min_cosine: 0.999
+
+# --smoke runs the same settings on the CPU with the tiny random Qwen3 and the stand-in tokenizer
+# built in the script, on the episode fixture of tests/testdata/train_hypernet/ (its toy split
+# stands in for train), two processes, small chunks, and the check. These keys replace the above.
+smoke:
+  # Keeps smoke outputs apart from the GPU run's.
+  run_id: MT-01-smoke
+  # The random stand-in weights get their own cache namespace.
+  model_id: smoke/tiny-random-qwen3
+  # BRIEF A0: no local GPU work.
+  device: cpu
+  # fp32: CPU bf16 matmuls are slow, and the smoke checks logic, not precision.
+  dtype: float32
+  # The tiny Qwen3 uses eager attention, as in the P3.2 smokes.
+  attn_implementation: eager
+  # 2 of the tiny model's 4 layers: mid-stack, as 24 of 36 is.
+  layer: 2
+  # Small batches, so a chunk runs several prefill batches.
+  batch_tokens: 4096
+  # Generous for CPU; the smoke takes seconds.
+  max_wall_s: 600
+  # The smoke cache, under runs/, which git ignores.
+  cache_dir: runs/MT-01-smoke/embedding_cache
+  # The smoke logs, also under runs/.
+  out_dir: runs/MT-01-smoke
+  # The training fixture: a P3.4 build in the real format with a passing synthetic report (paths
+  # from the repository root).
+  episodes:
+    root: tests/testdata/train_hypernet/episode_build
+    manifest_sha256: 15317ba48d7efefab0b37aaa69727454cb3fd71141140a1cd1d018c4013b0550
+    check_root: tests/testdata/train_hypernet/check
+    splits: [toy, val]
+    max_tokens: 8192
+  # Two CPU processes, so the parts and the merge run as on four GPUs.
+  gpus: 2
+  # Chunks of 4 pairs, so each process writes several part files.
+  chunk_pairs: 4
+  # The check on 8 pairs.
+  verify_pairs: 8
+  # Seed of the tiny model's weights.
+  seed: 0

@@ -1,0 +1,17 @@
+arc26: ARC-AGI-2 solvers
+Copyright 2026 Alyahya-akkam
+
+This repository is licensed under the Apache License 2.0 (LICENSE).
+
+Third-party material:
+
+- reference/reference_notebook.ipynb and the code generated from it in arc26/nvarc/, and the
+  code moved from it into arc26/ttt.py, arc26/decode.py, arc26/solver.py and the modules whose
+  header says so, come from the NVARC ARC Prize 2025 notebook
+  (https://www.kaggle.com/code/sorokin/arc2-qwen3-unsloth-flash-lora-batch4-queue) by Ivan Sorokin
+  and Jean-Francois Puget, released under the Apache License 2.0. Changed files carry a header
+  naming their source cell; see reference/README.md.
+
+- scripts/fn_kvq/sglang_kv4.py and the hash-guarded engine edits in configs/P5.*.yaml adapt code
+  from SGLang (https://github.com/sgl-project/sglang) as forked at
+  https://github.com/jpezzulli/sglang-rtxpro6000, released under the Apache License 2.0.

@@ -1,0 +1,19 @@
+# Settings of scripts/repack_output.py for the install notebook's output (task X2, X2-01
+# attempt 3). Flat key: value lines: the script reads them itself, with the image's Python and no
+# PyYAML. Runbook docs/runbooks/repack_output.md.
+
+# Kaggle's mount of sorokin/pip-install-unsloth-flash-patch version 2, attached as every build
+# attaches it (kernel_source_versions); the folder the reference's sys.path names (P0.5d probe).
+source: /kaggle/usr/lib/notebooks/sorokin/pip_install_unsloth_flash_patch
+
+# In /kaggle/working, so the session's output keeps it: parts/ and MANIFEST.json.
+out: /kaggle/working/repack
+
+# 1 GiB per part: at the rate Kaggle streamed the whole output's archive (about 19 MB/s,
+# X1-01's cache) a part downloads in about 56 s, well inside the about 190 s after which Kaggle
+# cut every stream of that archive (X2-01 attempts 2 and 3); at a single file's rate (X1-01's
+# init, 82 MB/s) in about 13 s.
+part_bytes: 1073741824
+
+# The parts' stem: parts/kaggle_lib.tar.000, .001, ...
+name: kaggle_lib

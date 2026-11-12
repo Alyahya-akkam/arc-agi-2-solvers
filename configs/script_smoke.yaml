@@ -1,0 +1,60 @@
+# Script notebook build for the Kaggle CPU check of script mode (task P0.5d): it runs
+# scripts/env_probe.py, the K0 environment probe, on the submission notebook's stack and plumbing,
+# without GPU quota. It proves on Kaggle what every Phase 3 script notebook (P3.1-01, P3.2-01,
+# P3.6) relies on: the script and its config beside the wheel in the code dataset, found by search
+# and checked by sha256; the offline install of the wheel; `python <script> --config <config>` by
+# the python on PATH with the hard stop; the script's own outputs and the notebook's logs in
+# run_logs/. Read by scripts/build_submission.py and scripts/build_kaggle_notebook.py with
+# yaml.safe_load; runbook docs/runbooks/build_submission.md (script mode).
+
+# A script config (task P0.5d): the notebook runs one script, never the solver, and is never
+# submitted.
+kind: script
+
+# Its own notebook, <owner>/<slug>. No pre-run brief may name it: Kaggle may keep a slug's
+# previous accelerator, so the gateway refuses CPU pushes to briefed notebooks.
+kaggle_notebook: alyahya737/arc26-script-smoke
+
+# The same private code dataset as every build (ADR-010); a version made from this build holds
+# the wheel, env_probe.py, and this file.
+code_dataset: alyahya737/arc26-code
+
+# Same competition as the other builds: it mounts the data (the DEV subsets) that scripts read.
+competition: arc-prize-2026-arc-agi-2
+
+# No accelerator: a CPU session spends no GPU quota and needs no pre-run brief (BRIEF A9), and
+# the bf16 stop does not apply. A script that needs bf16 asks for NvidiaL4 (4xL4): Kaggle ran an
+# NvidiaL4X1 push on its default 2xT4, which has no bf16 (P0.3-01).
+accelerator: null
+
+# Same pinned image and model as the other builds, so the check runs the stack the Phase 3
+# scripts will run on, except for the GPUs.
+reference_metadata: reference/kernel-metadata.json
+
+# Same install notebook version as the other builds (see configs/submission_P0.5-01.yaml): its
+# packages are what a script imports, and env_probe.py lists where they are mounted.
+kernel_source_versions:
+  sorokin/pip-install-unsloth-flash-patch: 2
+
+# Same model folder name as the other builds: the environment check proves the model is found.
+model_slug: qwen3_4b_grids15_sft139
+
+# The K0 probe (P0.5a): standard library only, already run on Kaggle (K0), writes
+# run_logs/env_probe.json and env_probe.md in about a minute. Equally small as the brief's first
+# choice, scripts/cache_embeddings.py --smoke, which is on task/P3.2 and not in this branch; once
+# P3.2 is merged, that script with its config and ["--smoke"] is the stronger check.
+script: scripts/env_probe.py
+
+# env_probe.py reads no config: it ignores unknown arguments by design (a script kernel's argv
+# can carry an IPython connection file), so this file stands in, and the check still exercises
+# the config's packaging, search, sha256 check, and --config argument.
+script_config: configs/script_smoke.yaml
+
+# No arguments after --config: env_probe.py's only flag, --root, defaults to /, the session's
+# real filesystem.
+args: []
+
+# Seconds after the notebook's start: the hard stop. The environment check and the install take
+# about a minute (P0.5-cpu: 50 s for the install) and the probe about a minute (K0), so 600 s is
+# five times the expected need; the push's 1800 s Timeout leaves the logs ample time.
+script_kill_s: 600

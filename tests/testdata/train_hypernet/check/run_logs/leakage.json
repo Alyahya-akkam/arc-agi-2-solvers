@@ -1,0 +1,6 @@
+{
+ "manifest_sha256": "15317ba48d7efefab0b37aaa69727454cb3fd71141140a1cd1d018c4013b0550",
+ "note": "synthetic: no evaluation data exists for the fixture; the pass lets it load",
+ "pass": true,
+ "schema": 1
+}

@@ -1,0 +1,122 @@
+# Run P5.2-00 (FA2 part; task P5.2): FlashAttention 2 built for the L4 from its sdist, against
+# the wheelhouse's torch 2.13.0+cu130 and Python 3.12, on a free CPU session. Its own notebook so
+# the environment check (configs/P5.2-00.yaml) reports in minutes while this compiles for hours.
+# SGLang's QSA decode needs classic FlashAttention 2 on sm89 (sgl-project/sglang#36968; recipe
+# R3, docs/research/flash_next_sglang.md on task/ideas). P5.2-00 fetches a prebuilt wheel; this
+# build is the fallback, pushed only if that wheel fails its import test. Read by
+# scripts/fn_env.py (embedded as JSON by scripts/build_fn_notebooks.py); runbook
+# docs/runbooks/fn_probe.md. CPU: no brief.
+
+# Run id of the report.
+run_id: P5.2-00-fa2
+
+# The Kaggle script kernel (scripts/build_fn_notebooks.py).
+kernel:
+  # Its own slug (no brief names it); P5.2-01 attaches its output when the recipe needs FA2.
+  id: alyahya737/arc26-fn-fa2
+  # Slugifies to the slug.
+  title: arc26 fn fa2
+  code_file: fn_env.py
+  # On: the sdist and the build tools come from PyPI.
+  enable_internet: true
+  # Kaggle's latest image (Python 3.12), as configs/P5.2-00.yaml.
+  docker_image: null
+  # CPU: nvcc compiles without a GPU, and the session is free.
+  accelerator: null
+  # The wheelhouse gives the exact torch, the CUDA 13 nvcc wheels, and uv.
+  dataset_sources: [dfranzen/pennyroyal-v253]
+  # No model: nothing here loads one.
+  model_sources: []
+  competition_sources: []
+  kernel_sources: {}
+  # Kaggle's 12-hour session cap less 10 minutes: a full FA2 build for one architecture on 4
+  # cores takes hours (estimate: about 70 kernel files, several minutes each).
+  timeout_s: 42600
+
+# Steps: the listing, Python 3.12, the venv (torch and nvcc), the build, the manifest.
+steps: [listing, python, venv, fa2, package]
+
+# As configs/P5.2-00.yaml, with its own report folder and scratch.
+paths:
+  input_root: /kaggle/input
+  working: /kaggle/working
+  # Pulled by kaggle_ops.py pull (json, txt, md, log).
+  report_dir: /kaggle/working/run_logs/fn_fa2
+  # The built wheel, kept in the output for P5.2-01.
+  wheels_out: /kaggle/working/wheels
+  python_out: /tmp/fn-fa2/python
+  scratch: /tmp/fn-fa2
+
+# As configs/P5.2-00.yaml.
+listing:
+  depth: 4
+  max_entries: 2000
+  disk_paths: [/tmp, /kaggle/working]
+
+# Only the wheelhouse.
+inputs:
+  wheelhouse:
+    path: /kaggle/input/datasets/dfranzen/pennyroyal-v253
+    marker: requirements.lock
+    hint: pennyroyal
+
+# As configs/P5.2-00.yaml.
+python:
+  want: "3.12"
+  standalone: auto
+  uv_request: "3.12"
+  fallback_url: ""
+  timeout_s: 600
+  tarball: python312.tar.gz
+
+uv:
+  wheel_glob: uv-*.whl
+  fallback_path: null
+
+# The whole lock: the build must see exactly the torch and CUDA headers P5.2-01 runs.
+venv:
+  prefix: /tmp/fn-fa2/venv
+  wheels_dir: wheels
+  lock: requirements.lock
+  sglang_glob: sglang-*.whl
+  # Not needed to build, and skipping it saves a minute.
+  reinstall_sglang_no_deps: false
+  timeout_s: 2400
+  extra_find_links: []
+  report_versions: [torch, nvidia-cuda-nvcc, triton]
+
+# The FlashAttention 2 build (step fa2).
+fa2:
+  # The recipe's source build (R3): 2.8.3.post2 (PyPI sdist, 14 Oct); torch 2.13 still builds
+  # with FA2's C++17 flags.
+  version: 2.8.3.post2
+  # PyPI's JSON API gives the sdist's URL and sha256, which the download checks.
+  pypi_json: https://pypi.org/pypi/flash-attn/{version}/json
+  # FA2's setup.py needs these in the build environment (no build isolation, so it sees the
+  # venv's torch); pip itself, since uv's venv has none and FA2 builds with pip wheel.
+  build_deps: [pip, "setuptools>=70", wheel, ninja, packaging, psutil, einops]
+  build_env:
+    # FA2's own architecture switch: its kernels exist for sm80 and up, and an sm_80 cubin runs
+    # on sm_89 (binary compatibility within major 8), which is how FA2 runs on Ada.
+    FLASH_ATTN_CUDA_ARCHS: "80"
+    # Build even though no GPU is visible, and never fetch a prebuilt wheel instead.
+    FLASH_ATTENTION_FORCE_BUILD: "TRUE"
+    # torch's own arch flags, kept to the same one in case a file takes them.
+    TORCH_CUDA_ARCH_LIST: "8.0"
+    # A Kaggle CPU session has 4 cores and about 30 GB of RAM; an FA2 nvcc job peaks at a few GB.
+    MAX_JOBS: "4"
+    # One architecture: nothing for nvcc's own threads to parallelize.
+    NVCC_THREADS: "1"
+  # Seconds for the build: the session's cap less the setup and 15 minutes to save the output.
+  timeout_s: 39600
+  # The arch scan's target.
+  target_sm: 89
+  # The import tested after the install (the CUDA extension; fails without a driver on CPU).
+  module: flash_attn
+
+env:
+  OMP_NUM_THREADS: "4"
+  HF_HUB_OFFLINE: "1"
+
+# No smoke section: the FA2 step needs the network and hours; tests stub its runner.
+smoke: {}

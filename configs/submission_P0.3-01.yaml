@@ -1,0 +1,74 @@
+# Submission notebook build for run P0.3-01, revision 2: DEV4 on 4xL4 with one worker per GPU, the
+# first run of the solver wired for timing records (task P0.3b, BRIEF B5 P0.3). It checks that
+# every DEV4 puzzle yields complete and consistent records and that DEV4 still scores as in
+# P0.5-01, whose settings it repeats in a notebook of its own. Read by scripts/build_submission.py
+# and scripts/build_kaggle_notebook.py with yaml.safe_load; runbook
+# docs/runbooks/build_submission.md; pre-run brief docs/prerun/P0.3-01.md; revision 1's run,
+# docs/experiments/P0.3-01.md. A development run records timing in run_logs/timing/ (the notebook
+# does so in every development run). A development build, never to be submitted: submissions come
+# only from alyahya737/arc26-submission, built from a config meant for submission. From task P1.3
+# on, its MANIFEST.md and first cell say "not for submission": the builder's guard accepts only
+# builds for that notebook.
+
+# A development notebook of its own, <owner>/<slug>, owner KAGGLE_OWNER of scripts/kaggle_ops.py.
+# The submission notebook alyahya737/arc26-submission keeps only builds meant for submission:
+# its version 2 (run P1.1-01) is the Submission 1 candidate.
+kaggle_notebook: alyahya737/arc26-timing
+
+# The same private code dataset as every build (ADR-010). This build's wheel differs from the
+# P0.5-01 one (the timing wiring), so it needs the dataset version made from a P0.3b build
+# (version 3); later commits that touch only docs, configs, or scripts keep the wheel unchanged.
+code_dataset: alyahya737/arc26-code
+
+# Competition attached: it mounts the data, and only notebooks attached to it get L4s (research
+# note, section 2).
+competition: arc-prize-2026-arc-agi-2
+
+# 4xL4, as run A, P0.5-01, P1.1-01, and the scored rerun. 1xL4 (NvidiaL4X1) is not granted to this
+# notebook: revision 1 was pushed with it on 1 Oct, and Kaggle silently ran the session on 2xT4
+# (docs/experiments/P0.3-01.md). T4 cannot run the solver: it has no bf16 (compute capability 7.5),
+# so transformers refused the solver's bf16 training arguments at the first puzzle. So there is no
+# quicker accelerator for this solver and no fallback; the brief keeps the 30-minute queue limit.
+accelerator: NvidiaL4
+
+# Same pinned image and install notebook source as the P0.5-01 and P1.1-01 builds (ADR-010).
+reference_metadata: reference/kernel-metadata.json
+
+# Same install notebook version as every build (see configs/submission_P0.5-01.yaml).
+kernel_source_versions:
+  sorokin/pip-install-unsloth-flash-patch: 2
+
+# Same model folder name as every build (K0).
+model_slug: qwen3_4b_grids15_sft139
+
+# DEV4, the reference's four development tasks (5 test outputs), so the score compares with
+# P0.5-01's 2.5 of 4 and each puzzle's times with P0.5-01 and P1.1-01. Quoted so YAML never reads
+# an id as a number.
+subset: ["0934a4d8", "36a08778", "981571dc", "aa4ec2a5"]
+
+# One worker per L4, as in run A, P0.5-01, and the scored rerun: each puzzle runs on an L4 of its
+# own, so its timing records describe what one worker of the scored rerun does.
+workers: 4
+
+# Same PYTHONHASHSEED as run A, P0.5-01, and P1.1-01: one fixed seed for all comparisons.
+hash_seed: 0
+
+# The run solves DEV4: the timing records come from the solver.
+run_solver: true
+
+# Seconds after the notebook's start, development runs only: the workers' soft deadline, as in
+# configs/submission_P0.5-01.yaml. P0.5-01's session took 1516 s (run A 1568 s, run B 1689 s), so
+# 3600 s is more than twice that and never binds on a healthy run; the longest DEV4 puzzle took
+# 1226 s (P1.1-01).
+solver_end_s: 3600
+
+# Seconds after the start: the hard stop, 900 s after the soft deadline and above run A's longest
+# TTT training (831 s), so the workers stop on their own first, as in
+# configs/submission_P0.5-01.yaml. The brief's Timeout is this plus 900 s (5400 s), which leaves
+# time to write submission.json and run_logs after a hard stop.
+solver_kill_s: 4500
+
+# The solver's code (task P2.0, ADR-011): this run ran the moved reference (python -m
+# arc26.nvarc.starter), the default until the split solver passed run P2.0-01 and the default
+# flipped to "split" (2 Oct); the key, added then, keeps this config what ran.
+solver: nvarc

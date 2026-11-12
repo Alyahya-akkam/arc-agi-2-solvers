@@ -1,0 +1,81 @@
+# Script notebook build of run MT-03, the second session of H's meta-training (task MT): MT-02's
+# build with MT-02's output attached and --resume, and (revision 3, amendment of 17 Oct) a
+# session budget of the config's 41,400 s less a 45-minute pre-script allowance, with the hard
+# stop lowered by the same 2,700 s; nothing else (tests/test_notebook_local_mt.py checks it).
+# Read by scripts/build_submission.py and scripts/build_kaggle_notebook.py; runbook
+# docs/runbooks/train_hypernet.md (resuming across sessions); pre-run brief docs/prerun/MT-03.md.
+
+# A script config (task P0.5d): the notebook runs one script, never the solver, and is never
+# submitted.
+kind: script
+
+# A second notebook of task MT: Kaggle refuses a notebook's own output (invalidKernelSources), and
+# the builder refuses a config that attaches its own notebook, so the resume runs here.
+kaggle_notebook: alyahya737/arc26-mt-train-2
+
+# Meta-training's own private code dataset, the same version as MT-02's (version 2): the same
+# wheel, script, and config bytes, so the same RESUME_KEYS values, which a resume needs.
+code_dataset: alyahya737/arc26-code-mt
+
+# Same competition as every build: the environment check expects the mount.
+competition: arc-prize-2026-arc-agi-2
+
+# 4xL4, as MT-02: a resume needs the same world size (four processes).
+accelerator: NvidiaL4
+
+# Same pinned image and model as every build (MT-02's stack).
+reference_metadata: reference/kernel-metadata.json
+
+# Same install notebook version as every build (configs/submission_P0.5-01.yaml).
+kernel_source_versions:
+  sorokin/pip-install-unsloth-flash-patch: 2
+
+# Same model folder name as every build: the environment check finds the base by it.
+model_slug: qwen3_4b_grids15_sft139
+
+# MT-02's inputs, plus MT-02's output, version 1: its checkpoints folder holds latest.json, the two
+# newest full checkpoints, and best.pt.
+notebook_inputs:
+  alyahya737/arc26-p3-4-episodes: 2
+  alyahya737/arc26-p3-4-leakage: 2
+  alyahya737/arc26-mt-cache: 1
+  alyahya737/arc26-mt-train-1: 1
+
+# The training script, the same bytes as MT-02's.
+script: scripts/train_hypernet.py
+
+# MT-02's config, the same bytes: the resume refuses another value of any RESUME_KEYS setting.
+script_config: configs/train_hypernet_MT.yaml
+
+# MT-02's arguments with its --max-wall-s at this session's budget, plus the checkpoints folder of
+# MT-02's output: the script reads its latest.json and continues from that step, data cursor,
+# optimizer, and RNG states. The budget is not a resume setting, so MT-02's capped checkpoint
+# (written under 12,600 s) is accepted under this one.
+# --max-wall-s 38700: the config's 41,400 s less a 2,700 s (45-minute) allowance for the time
+# Kaggle may spend between RUNNING and the notebook's first cell, if the 12 h limit counts from
+# RUNNING: measured 37 min (P6.5-02), 41 (P6.3-02 revision 5), about 10 (P6.3-04), 37 s (P6.5-03);
+# 45 min sits above every case, as the shot build of task P6.5b plans (docs/prerun/P6.5-03.md on
+# task/P6.5b). On the command line, not in train_hypernet_MT.yaml, so the wheel, the script, and
+# the config keep MT-02's bytes and the code dataset stays version 2.
+args:
+  - --commit
+  - "{commit}"
+  - --episodes-root
+  - "{input:alyahya737/arc26-p3-4-episodes}"
+  - --check-root
+  - "{input:alyahya737/arc26-p3-4-leakage}"
+  - --embedding-cache
+  - "{input:alyahya737/arc26-mt-cache}/embedding_cache"
+  - --max-wall-s
+  - "38700"
+  - --resume
+  - "{input:alyahya737/arc26-mt-train-1}/checkpoints"
+
+# Revision 2's hard stop (42,300 s) less the same 2,700 s allowance, so the margin after the
+# script's budget is revision 2's: the script starts about 67 s (MT-02, measured) to 213 s (MT-01)
+# into the notebook and stops itself at --max-wall-s 38,700 s, so its budget ends by about
+# 38,913 s, 687 s before this; a resumed session's setup has no step-0 validation. With 45 minutes
+# before the first cell, the hard stop and the logs (300 s) end by 2,700 + 39,600 + 300 = 42,600 s
+# from RUNNING, under Kaggle's 43,200 s. The brief's Timeout stays 42,600 s, this plus the
+# allowance and the 300 s: Kaggle's own timer may count from RUNNING.
+script_kill_s: 39600

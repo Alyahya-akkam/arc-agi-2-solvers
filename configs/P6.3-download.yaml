@@ -1,0 +1,314 @@
+# The two download notebooks of task P6.3 (ADR-020; docs/tasks/P6.3.md, build item 1). Read by
+# scripts/build_download_notebooks.py with yaml.safe_load: every key below is required and no
+# other key is accepted. Both are private CPU notebooks with internet on and no accelerator, so no
+# pre-run brief applies (BRIEF A9); the gateway pushes them as CPU pushes. Their outputs stay on
+# Kaggle and are attached to the GPU runs as notebook inputs; only run_logs/ comes back. Runbook:
+# docs/runbooks/agent_spike.md, section "How to run it".
+
+# Kaggle username that owns both notebooks: scripts/kaggle_ops.py acts only for KAGGLE_OWNER.
+owner: alyahya737
+
+# The pulled metadata of the reference notebook, read only for its docker_image. Both notebooks
+# pin that image ("original"): the Python 3.11.13, glibc 2.35 GPU image every script notebook
+# runs on (env.json of P0.5-cpu, P0.5d-cpu, MT-01), whose CPU sessions use the same image, so the
+# wheelhouse is resolved and install-checked for exactly the interpreter of the GPU run.
+reference_metadata: reference/kernel-metadata.json
+
+# The weights notebook: one revision of one repository, every file pinned by hash.
+model:
+  # The notebook that downloads the weights; its own slug, which no pre-run brief names (the
+  # gateway refuses CPU pushes to briefed slugs, since Kaggle may keep a slug's accelerator).
+  kaggle_notebook: alyahya737/arc26-dl-qwen38-int4
+  # ADR-020's model: Qwen3.8-27B as W4A16 g128 with static FP8 KV scales, Apache 2.0, not gated
+  # (HF API, 9 Oct); docs/research/qwen38_and_small_models.md, sections 2.2 and 7.1.
+  repo_id: RedHatAI/Qwen3.8-27B-INT4
+  # The full commit of the reviewed revision 91bd022d (HF API commits list, 9 Oct; main's head,
+  # "Update README.md", 2026-09-28): a later push to the repo cannot change what is downloaded.
+  revision: 91bd022d5b49442a868bc35008f6c21e1860edfa
+  # Folder under /kaggle/working that holds the 12 repository files; the GPU runs pass it to
+  # vLLM as the model directory.
+  folder: qwen38-27b-int4
+  # Every file of the revision with its size and hashes, from the HF API at the revision
+  # (?blobs=true, 9 Oct): sha256 is the LFS object id for the three LFS files and was computed
+  # from the fetched file for the nine small ones, whose git blob sha1 (the API's blobId) it
+  # checked. The notebook checks all three numbers per file after the download, compares this
+  # list with the API's answer at run time, and deletes the folder on any mismatch. Total
+  # 19,472,990,100 bytes.
+  files:
+    - {name: .gitattributes, size: 1570, sha256: 34448b82c17d60fec9b65b1f093c115ddbaadc04beb1b0140b6bfed2e012a930, git_sha1: 52373fe24473b1aa44333d318f578ae6bf04b49b}
+    - {name: README.md, size: 6452, sha256: b732cc57c4ae7d2e17c11cbf7e75312146048f7105dd05cbda66460a0d97e681, git_sha1: 7799f5fba1417edaf5ad3490d1e6842c44b9b0e3}
+    - {name: chat_template.jinja, size: 8952, sha256: c3cf9e34abf4f9e36c2d72165aa9c132d3e2a725b6c2586aaa3a8af9d7a81041, git_sha1: c0c686f9c38d70d179fb7b5f5aa7530bc913dda3}
+    - {name: config.json, size: 20952, sha256: 5498b42f9ea96d2669709c177e29122997ce14786a7530fe1ea1b340e535776c, git_sha1: c16a4740ae6ad1f4d335f679ceb2a93f33c7256c}
+    - {name: generation_config.json, size: 214, sha256: 6ef70d6670f24f03a9041724c7663ef26bc1e678d10f79c93fe11c192ba14b7d, git_sha1: 1f489fac1c66a575e119c65483a27147f0aab231}
+    - {name: model.safetensors, size: 18603387656, sha256: fd5c287e3a03f30b0e53fd5fe66ec90ab5fdd94807f7f8df699cca3ae9534910, git_sha1: null}
+    - {name: model.safetensors.index.json, size: 170752, sha256: 4785ab547634568e4e2d5887da9dc9986e554c313e733a4a1ef2c2d6f02bf292, git_sha1: b4a12b678f3099fa2bfa26c3745ff25482806f7d}
+    - {name: model_mtp.safetensors, size: 849400392, sha256: 1d8268aa85ace093a561e3e7b63b9d390dac1cd55a90cd55b5ec509c3c9da9fe, git_sha1: null}
+    - {name: processor_config.json, size: 1220, sha256: bfbc24af59a3e73a9cd0653b8d4ae758dfaec4e3e6c15dfb1c6c8ee8d5683c85, git_sha1: 43c4343ec493f200e452f87a7c6649ecdfcce1ac}
+    - {name: recipe.yaml, size: 1449, sha256: bc61e7b4d3601cc6ab5feeacb2c9a6d711c22be10e29c9ad808591d29cb58027, git_sha1: 2cb819ba547c5a90f571976987a54faa2aae7e41}
+    - {name: tokenizer.json, size: 19989325, sha256: 06b9509352d2af50381ab2247e083b80d32d5c0aba91c272ca9ff729b6a0e523, git_sha1: null}
+    - {name: tokenizer_config.json, size: 1166, sha256: 5f7aa0d810000c4a0940b35c8f16e56c3439260fccc13a321826ebc3ccf2501f, git_sha1: b4acebe045132228e18a4e2ca7f75ce137d1fbf7}
+  # Free bytes required in /kaggle/working beyond the files before the download starts: the
+  # logs and MANIFEST.json take kilobytes. The probes measured a 20,957,446,144-byte
+  # /kaggle/working with 20,940,402,688 free at the start (P0.5d-cpu, the pinned image, 1 Oct;
+  # K0-latest, 30 Sep): 1.47 GB spare for these 19.47 GB, so the check passes with room.
+  free_margin_bytes: 100000000
+  # Parallel file downloads of snapshot_download: the three LFS files and the nine small ones
+  # at once; the 18.6 GB model.safetensors dominates either way.
+  max_workers: 8
+  # Download attempts: snapshot_download resumes a partly written file, so a dropped connection
+  # costs one retry, not the 19 GB.
+  attempts: 3
+  # Hard stop of the push in seconds (scripts/kaggle_ops.py push --timeout): 19.47 GB at a slow
+  # 10 MB/s is 33 minutes, hashing it about 2, and the session saves the output after the script;
+  # 2 h leaves ample room and costs no GPU quota.
+  timeout_s: 7200
+
+# The wheelhouse notebook: vLLM and its closure as binary wheels for the GPU run's interpreter.
+wheels:
+  # The notebook that builds the engine wheelhouse; its own slug, named by no pre-run brief.
+  kaggle_notebook: alyahya737/arc26-dl-agent-wheels
+  # The interpreter the wheels are for, major.minor: the pinned image's Python 3.11.13 (env.json
+  # of every script notebook run). The notebook stops if its own interpreter differs.
+  python: "3.11"
+  # Top-level requirements. vLLM 0.31.0 (2026-10-05): the release the models note read
+  # (qwen38_and_small_models.md, section 4.1), cp38-abi3 manylinux_2_28 x86_64, Python 3.10 to
+  # 3.14, pinning torch 2.13.0 with the CUDA 13.0.3 runtime wheels, which driver 580.178.04
+  # (MT-01) supports (CUDA 13.0 needs 580.65.06 or later). httpx is the agent's HTTP client
+  # (task P6.2). pip bootstraps the offline venv from the wheelhouse itself.
+  requirements:
+    - vllm==0.31.0
+    - httpx==0.28.1
+    - pip==26.2.1
+  # Prebuilt FlashInfer kernels for sm_89 (L4), from FlashInfer's own index (not on PyPI; 113.8
+  # MB, HEAD request 9 Oct), downloaded without dependencies and installed as an optional extra:
+  # a failure is recorded, not fatal, since the spike runs Triton attention and the PyTorch
+  # sampler. flashinfer-cubin 0.7.0.post1 (1.57 GB, all architectures, mostly Hopper and
+  # Blackwell kernels) is left out for its size. Incomplete (P6.3-01 attempt 2, 10 Oct): this is
+  # a provider wheel, and FlashInfer 0.7 reaches providers only through the shim
+  # flashinfer-jit-cache==0.7.0.post1+cu130 (same index, folder flashinfer-jit-cache/), which
+  # owns flashinfer_jit_cache/__init__.py; without it `import flashinfer` raises, so the GPU runs
+  # remove the provider (scripts/agent_spike.py, prepare_engine). The next wheelhouse adds the
+  # shim or drops this extra, and makes flashinfer a required import.
+  extras:
+    - {requirement: flashinfer-jit-cache-sm89==0.7.0.post1+cu130, find_links: "https://flashinfer.ai/whl/cu130/flashinfer-jit-cache-sm89/"}
+  # The index pip resolves from, with --isolated so no image setting (PIP_* variables, pip.conf)
+  # changes it.
+  index_url: https://pypi.org/simple
+  # Folder under /kaggle/working that holds the wheels, requirements.txt, constraints.txt,
+  # extras.txt, install_wheelhouse.py, and MANIFEST.json.
+  folder: wheelhouse
+  # Modules the install check imports in the fresh venv: torch and vllm must import on the CPU
+  # image (CUDA is not initialized by an import), httpx is the client. A failure fails the check.
+  imports: [torch, vllm, httpx]
+  # Modules whose import is recorded but not required: the sm_89 FlashInfer cache (optional).
+  optional_imports: [flashinfer, flashinfer_jit_cache]
+  # Versions the wheelhouse must hold, checked by name in the downloaded files.
+  expected_versions: {vllm: 0.31.0, torch: 2.13.0}
+  # Hard stop of the push in seconds: about 4 GB of wheels and a venv install of them on 4 CPUs
+  # take minutes (estimate); 1 h is ample and costs no GPU quota.
+  timeout_s: 3600
+  # The resolution of the requirements by uv 0.12.3 on 9 Oct for CPython 3.11 on
+  # x86_64-manylinux_2_35 with --only-binary :all:, from PyPI metadata alone (no wheel
+  # downloaded): 199 packages, about 3.95 GB of wheels by PyPI's file sizes. Passed to pip as
+  # constraints, so the wheelhouse holds exactly this tested set, every package has a binary
+  # wheel for the image, and the resolver does not backtrack.
+  constraints:
+    - agent-detector==2.0.0
+    - aiohappyeyeballs==2.7.1
+    - aiohttp==3.14.4
+    - aiosignal==1.4.0
+    - annotated-doc==0.0.5
+    - annotated-types==0.8.0
+    - anthropic==1.13.0
+    - anyio==4.15.1
+    - apache-tvm-ffi==0.1.11
+    - astor==0.8.1
+    - attrs==26.1.0
+    - blake3==1.0.11
+    - cachetools==7.2.1
+    - cbor2==6.1.5
+    - certifi==2026.7.22
+    - cffi==2.1.1
+    - charset-normalizer==3.5.2
+    - click==8.5.0
+    - cloudpickle==3.1.2
+    - compressed-tensors==0.17.0
+    - cryptography==50.0.2
+    - cuda-bindings==13.4.3
+    - cuda-core==1.2.1
+    - cuda-pathfinder==1.8.3
+    - cuda-python==13.4.1
+    - cuda-tile==1.6.0
+    - cuda-toolkit==13.0.3.0
+    - depyf==0.20.0
+    - detect-installer==0.2.1
+    - dill==0.4.1
+    - dnspython==2.9.0
+    - docstring-parser==0.18.0
+    - einops==0.8.2
+    - email-validator==2.3.0
+    - fastapi-cli==0.0.32
+    - fastapi-cloud-cli==0.26.0
+    - fastapi==0.136.3
+    - fastar==0.12.0
+    - fastsafetensors==0.4.0
+    - filelock==4.0.12
+    - flashinfer-python==0.7.0.post1
+    - frozenlist==1.8.0
+    - fsspec==2026.9.0
+    - googleapis-common-protos==1.75.5
+    - grpcio==1.84.0
+    - h11==0.16.0
+    - hf-xet==1.7.0
+    - httpcore2==2.13.1
+    - httpcore==1.0.9
+    - httptools==0.8.0
+    - httpx2==2.13.1
+    - httpx==0.28.1
+    - huggingface-hub==1.33.0
+    - humming-kernels==0.1.16
+    - idna==3.20
+    - ijson==3.5.1
+    - instanttensor==0.2.1
+    - interegular==0.3.3
+    - jinja2==3.1.6
+    - jiter==0.17.0
+    - jmespath==1.1.0
+    - jsonschema-specifications==2025.9.1
+    - jsonschema==4.26.0
+    - lark==1.2.2
+    - llguidance==1.7.6
+    - llvmlite==0.47.0
+    - lm-format-enforcer==0.11.3
+    - loguru==0.7.3
+    - markdown-it-py==4.2.0
+    - markupsafe==3.0.4
+    - mcp-types==2.3.0
+    - mcp==2.3.0
+    - mdurl==0.1.2
+    - mistral-common==1.12.0
+    - ml-dtypes==0.6.0
+    - model-hosting-container-standards==0.1.16
+    - mpmath==1.3.0
+    - msgspec==0.22.0
+    - multidict==6.9.1
+    - nccl-extensions==0.1.0
+    - nccl4py==0.6.0
+    - networkx==3.6.1
+    - ninja==1.13.2
+    - numba==0.65.0
+    - numpy==2.3.5
+    - nvidia-cublas==13.1.1.3
+    - nvidia-cuda-cccl==13.3.4.3.1
+    - nvidia-cuda-crt==13.4.92
+    - nvidia-cuda-cupti==13.0.85
+    - nvidia-cuda-nvcc==13.4.92
+    - nvidia-cuda-nvdisasm==13.4.92
+    - nvidia-cuda-nvrtc==13.0.88
+    - nvidia-cuda-runtime==13.0.96
+    - nvidia-cudnn-cu13==9.20.0.48
+    - nvidia-cudnn-frontend==1.31.0
+    - nvidia-cufft==12.0.0.61
+    - nvidia-cufile==1.15.1.6
+    - nvidia-curand==10.4.0.35
+    - nvidia-cusolver==12.0.4.66
+    - nvidia-cusparse==12.6.3.3
+    - nvidia-cusparselt-cu13==0.8.1
+    - nvidia-cutlass-dsl-libs-base==4.7.1
+    - nvidia-cutlass-dsl-libs-core==4.7.1
+    - nvidia-cutlass-dsl-libs-cu12==4.7.1
+    - nvidia-cutlass-dsl-libs-cu13==4.7.1
+    - nvidia-cutlass-dsl==4.7.1
+    - nvidia-ml-py==13.615.71
+    - nvidia-nccl-cu13==2.29.7
+    - nvidia-nvjitlink==13.4.92
+    - nvidia-nvshmem-cu13==3.4.5
+    - nvidia-nvtx==13.0.85
+    - nvidia-nvvm==13.4.92
+    - nvtx==0.2.15
+    - openai==3.27.0
+    - opencv-python-headless==5.0.0.93
+    - opentelemetry-api==1.45.1
+    - opentelemetry-exporter-http-transport==0.66b1
+    - opentelemetry-exporter-otlp-common==0.66b1
+    - opentelemetry-exporter-otlp-proto-common==1.45.1
+    - opentelemetry-exporter-otlp-proto-grpc==1.45.1
+    - opentelemetry-exporter-otlp-proto-http==1.45.1
+    - opentelemetry-exporter-otlp==1.45.1
+    - opentelemetry-proto==1.45.1
+    - opentelemetry-sdk==1.45.1
+    - opentelemetry-semantic-conventions-ai==0.5.1
+    - opentelemetry-semantic-conventions==0.66b1
+    - oss-harmony==0.0.11
+    - outlines-core==0.2.14
+    - packaging==26.3
+    - partial-json-parser==0.2.1.1.post7
+    - pillow==12.3.0
+    - pip==26.2.1
+    - prometheus-client==0.26.0
+    - prometheus-fastapi-instrumentator==8.1.0
+    - propcache==0.5.4
+    - protobuf==7.36.2
+    - psutil==7.2.2
+    - py-cpuinfo==9.0.0
+    - pybase64==1.5.1
+    - pycountry==26.2.16
+    - pycparser==3.11
+    - pydantic-core==2.50.0
+    - pydantic-extra-types==2.11.1
+    - pydantic-settings==2.15.0
+    - pydantic==2.14.0
+    - pygments==2.21.0
+    - pyjwt==2.15.1
+    - pynvvideocodec==2.0.4
+    - python-dotenv==1.2.4
+    - python-json-logger==4.2.0
+    - python-multipart==0.0.32
+    - pyyaml==6.0.3
+    - pyzmq==27.2.0
+    - quack-kernels==0.6.5
+    - referencing==0.37.0
+    - regex==2026.9.29
+    - requests==2.34.2
+    - rich-toolkit==0.20.6
+    - rich==15.0.0
+    - rignore==0.8.1
+    - rpds-py==2026.9.1
+    - safetensors==0.8.0
+    - sentencepiece==0.2.2
+    - sentry-sdk==2.71.0
+    - setproctitle==1.3.8
+    - setuptools==84.0.0
+    - shellingham==1.5.4
+    - sniffio==1.3.1
+    - sse-starlette==3.5.0
+    - starlette==1.7.0
+    - supervisor==4.3.0
+    - sympy==1.14.0
+    - tabulate==0.10.0
+    - tiktoken==0.14.0
+    - tilelang==0.1.12
+    - tokenizers==0.23.3
+    - tokenspeed-mla==0.1.8
+    - tokenspeed-triton==3.8.10.post20260920
+    - torch-c-dlpack-ext==0.1.5
+    - torch==2.13.0
+    - torchaudio==2.11.0
+    - torchcodec==0.17.0
+    - torchvision==0.28.0
+    - tqdm==4.70.1
+    - transformers==5.17.0
+    - triton==3.7.1
+    - truststore==0.10.4
+    - typer==0.27.3
+    - typing-extensions==4.16.0
+    - typing-inspection==0.4.4
+    - urllib3==2.8.0
+    - uvicorn==0.54.0
+    - uvloop==0.23.0
+    - vllm==0.31.0
+    - watchfiles==1.3.0
+    - websockets==17.2
+    - xgrammar==0.2.7
+    - yarl==1.25.1
+    - z3-solver==4.15.4.0

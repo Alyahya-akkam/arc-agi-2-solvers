@@ -1,0 +1,354 @@
+# Stage 2 of the agent spike, run P6.3-02 (task P6.3, ADR-020; BRIEF A8, A9): the merged harness
+# (P6.1's sandbox and verifier, P6.2's engine client, loop, runner, and selection) on DEV40 with
+# P6.3-01's engine. Read by scripts/agent_spike.py with yaml.safe_load: every key below is
+# required and no other key is accepted. Pre-run brief: docs/prerun/P6.3-02.md (revision 6).
+# Runbook: docs/runbooks/agent_spike.md. The engine sections equal configs/P6.3-01.yaml's but for
+# server.max_model_len (a test checks it). Revision 3 set the budgets from P6.3-01's attempt 3
+# (docs/experiments/P6.3-01.md, Borderline): about 300 generated tokens per second effective at
+# 32 requests with contexts capped at 32k, shorter attempts, phase 1 before phase 2. Revision 4
+# changes no value: its fixes are in the code (the sandbox's child path, the harness preflight),
+# and configs/P6.3-02-cpu-script.yaml runs this file's smoke on Kaggle's CPU first. Revision 5
+# (after revision 4's Bad run, 156 of 201 engine calls cut at the turn cap while reasoning,
+# docs/experiments/P6.3-02.md): reasoning kept across turns, a forcing turn after every cut turn
+# (agent.forcing_tokens), and the forcing check (section forcing) in place of the preserve check,
+# which passed on 12 Oct. Revision 6 (after revision 5's Fault: the forcing check's render
+# re-rendered the request through /tokenize, which dropped the reasoning the real call had kept)
+# changes no value: the render check reads the prompt from the call's own response, the forcing
+# note asks for the program alone (its reserve is 6,021 tokens, 60 more), and the opening counts
+# are logged. "Models note" is docs/research/qwen38_and_small_models.md, "design note"
+# agent_library_design.md.
+
+# Run id of the pre-run brief this config serves; run.json and summary.md carry it.
+run_id: P6.3-02
+
+# The project's one fixed seed (CLAUDE.md): P6.2's runner derives each attempt's seed from it.
+seed: 0
+
+# The script's own wall-time budget in seconds from its start. The stages' limits: install 600,
+# the engine preparation's import check 300, boot 900, the forcing check 300, phase 1 3,600,
+# phase 2 3,600, sum 9,300 s; plus the inputs, harness preflight, preflight, sanity, selection,
+# and score, about 15 s in revision 4's run (0.02, 4.95, 3.44, 1.7). Every stage can run to its
+# limit inside this budget, so the deadline never cuts phase 2 short. The script starts 54.8 s (attempt 3) to 188.9 s (attempt 2)
+# after the notebook, so it stops by about 10,090 s of notebook time; the notebook's hard stop is
+# 10,500 s after its start, the Timeout 10,800 s (3 h), with 300 s for the logs.
+max_wall_s: 9900
+
+# The forcing check first (a few minutes; a failure stops the run as a Fault before the agent's
+# hour-long phases), then the agent's cascade. The preserve check is dropped: it passed on 12 Oct
+# (runs/P6.3-02/run_logs/preserve_check.json: growth R + 4 with reasoning kept on all 3 tasks),
+# and the forcing check measures the same growth on the agent's own path; it saves its 284 s.
+phases: [forcing, agent]
+
+# Root under which Kaggle mounts the inputs; the challenges are found by search under it (mounts
+# moved within 2026, docs/research/kaggle_first_runs.md, open risk 6).
+input_root: /kaggle/input
+
+# Outputs (BRIEF A8): what scripts/kaggle_ops.py pull brings back. The notebook writes its own
+# files here too (env.json, pip_freeze.txt, stages.json, candidates.json); the script avoids
+# those names.
+out_dir: /kaggle/working/run_logs
+
+# Scratch for the venv, the engine's caches, and the full server log: never saved, and /tmp had
+# about 1.1 TB free in every probe (K0, P0.5d-cpu).
+scratch_dir: /tmp/agent-spike
+
+# The weights: the model notebook's output (configs/P6.3-download.yaml, model).
+model:
+  # The folder of that output holding the 12 files; vLLM loads it read-only from the mount.
+  folder: qwen38-27b-int4
+  # The revision the download notebook verified: its MANIFEST.json must name it, with ok true.
+  revision: 91bd022d5b49442a868bc35008f6c21e1860edfa
+  # Re-hash the 19.47 GB here: no. The download notebook checked every file's sha256 against the
+  # Hub's (its MANIFEST.json); here each file's size is checked against that manifest, which
+  # catches a truncated mount, and a full hash would cost 1 to 2 minutes of 4xL4 time
+  # (estimate: 200 to 300 MB/s read).
+  verify_hashes: false
+
+# The engine: the wheels notebook's output (configs/P6.3-download.yaml, wheels).
+wheels:
+  # The folder of that output holding the wheels, requirement files, and the installer.
+  folder: wheelhouse
+  # The engine version its MANIFEST.json must list (ADR-020; models note, section 4.1).
+  vllm: 0.31.0
+  # The interpreter that creates the venv: the image's Python 3.11.13 at /usr/bin/python3.11, the
+  # kernel interpreter of every session log (P3.5-02, MT-01) and the one the wheels notebook's
+  # install check used; the script falls back to its own interpreter if this path is missing.
+  base_python: /usr/bin/python3.11
+  # The venv, under scratch: about 10 GB installed (estimate), never saved.
+  venv: /tmp/agent-spike/venv
+  # Seconds allowed for the offline install, pip unzipping about 4 GB of wheels without
+  # byte-compiling: 189.6 s in P6.3-01's attempt 2 and 106.1 s in attempt 3 (pip 87.2 s), so 600
+  # leaves more than 3 times the slower one.
+  timeout_s: 600
+  # Modules the engine's workers import, imported once with the venv's python and the engine's
+  # environment after the install and before the boot (prepare_engine), in the workers' order:
+  # the worker; the device communicators vLLM's CudaCommunicator imports unconditionally (attempt
+  # 2 died in each worker in flashinfer_all_reduce, on `import flashinfer.comm`); the model runner;
+  # the model (Qwen3_5ForConditionalGeneration), its Gated DeltaNet layer, the Triton and GDN
+  # attention backends, the W4A16 compressed-tensors scheme, the sampler, the kernel warmup. All
+  # exist in vLLM v0.31.0 (its source tree, checked 10 Oct).
+  engine_imports:
+    - vllm.v1.worker.gpu_worker
+    - vllm.distributed.device_communicators.cuda_communicator
+    - vllm.distributed.device_communicators.custom_all_reduce
+    - vllm.distributed.device_communicators.flashinfer_all_reduce
+    - vllm.distributed.device_communicators.flashinfer_pcie_ipc_all_reduce
+    - vllm.distributed.device_communicators.pynccl
+    - vllm.distributed.device_communicators.quick_all_reduce
+    - vllm.distributed.device_communicators.symm_mem
+    - vllm.v1.worker.gpu_model_runner
+    - vllm.model_executor.models.qwen3_5
+    - vllm.model_executor.layers.mamba.gdn.qwen_gdn_linear_attn
+    - vllm.v1.attention.backends.triton_attn
+    - vllm.v1.attention.backends.gdn_attn
+    - vllm.model_executor.layers.quantization.compressed_tensors.compressed_tensors
+    - vllm.v1.sample.sampler
+    - vllm.model_executor.warmup.kernel_warmup
+  # Seconds for that check: the 16 modules imported in about 35 s in P6.3-01's attempt 3 (the
+  # whole preparation 37.4 s, vllm.v1.worker.gpu_worker 28.6 s of it); 300 is about 8 times that.
+  engine_check_timeout_s: 300
+
+# vLLM's server: `vllm serve <model dir>` from the venv. The flags were checked against the
+# v0.31.0 sources (vllm/engine/arg_utils.py, vllm/entrypoints/launchers/cli_args.py) on 9 Oct.
+server:
+  # Local only: the client runs in the same session.
+  host: 127.0.0.1
+  # vLLM's default port.
+  port: 8000
+  # The name requests use; any string works.
+  served_model_name: qwen38-27b-int4
+  # All four L4s in one replica: the KV heads (4) allow 1, 2, or 4, the INT4 weights leave under
+  # 2 GB for KV on one L4, and one TP4 replica beats two TP2 replicas by not duplicating weights
+  # (models note, section 5.2).
+  tensor_parallel_size: 4
+  # FP8 KV cache with the checkpoint's static scales (its kv_cache_scheme): half the memory of
+  # BF16 KV, so about twice the sequences (models note, sections 1 and 5.2).
+  kv_cache_dtype: fp8
+  # Prefix caching on: the agent resends each conversation every turn (design note, 5.2); its hit
+  # rate is measured, and the NaN bug #55766 needs speculation, which is off.
+  enable_prefix_caching: true
+  # Context limit per request, equal to agent.context_tokens (P6.3-01's Borderline row: contexts
+  # capped where the measured rate clears 300; 377 tokens per second steady at 32k and 32
+  # requests). The KV pool (1,593,344 tokens, set by memory, not by this) holds 48.6 sequences of
+  # 32,768 against 24.3 of 65,536, so 32 attempts at the cap are never preempted. The only engine
+  # setting that differs from P6.3-01's: it bounds each request, not the batch or the kernels.
+  max_model_len: 32768
+  # Concurrent sequences: the largest concurrency measured (64). vLLM's default (1024) exceeded the
+  # state slots of hybrid models at CUDA-graph capture for one participant (models note, 4.3).
+  max_num_seqs: 64
+  # Prompt tokens per scheduler step (chunked prefill): 8192 keeps GEMMs large for the 32k prompts
+  # while bounding activation memory; vLLM's online default is smaller.
+  max_num_batched_tokens: 8192
+  # Share of each L4's 23,034 MiB vLLM may use: 0.90 leaves about 2.3 GB per GPU for the CUDA
+  # context, NCCL, and the sampler (vLLM's default is 0.92).
+  gpu_memory_utilization: 0.90
+  # Triton attention: it takes an FP8 KV cache on sm_89, where FlashAttention 2 does not, and
+  # needs no FlashInfer JIT, which would need a CUDA 13 nvcc the image lacks (models note, 4.1
+  # and 4.2).
+  attention_backend: TRITON_ATTN
+  # Text only: the vision tower (about 0.9 GB BF16) is never loaded (models note, 7.1).
+  language_model_only: true
+  # Splits the thinking from the answer (reasoning in the delta's `reasoning` field, vLLM 0.31);
+  # the model card's own serving command uses it.
+  reasoning_parser: qwen3
+  # Default sampling from the checkpoint's generation_config.json: temperature 1.0, top_p 0.95,
+  # top_k 20, the model card's settings for thinking.
+  generation_config: auto
+  # No other flag: in particular no --speculative-config. MTP collapses the batch to about three
+  # sequences on 24 GB cards (#55533) and speculation with prefix caching gives NaN logits
+  # (#55766) (models note, 4.3).
+  extra_args: []
+  # Engine environment, added to the image's with PYTHONPATH and PIP_* removed (the image's
+  # PYTHONPATH carries torch 2.8 from the attached install notebook).
+  env:
+    # The PyTorch top-k and top-p sampler, no FlashInfer JIT (no CUDA 13 nvcc in the image).
+    VLLM_USE_FLASHINFER_SAMPLER: "0"
+    # Engine startup limit: loading 19.5 GB from a mount, torch.compile, and graph capture may pass
+    # vLLM's default 600 s on the first boot (estimate); the script's own boot limit is below.
+    VLLM_ENGINE_READY_TIMEOUT_S: "1800"
+    # Caches on scratch, never in the output.
+    VLLM_CACHE_ROOT: /tmp/agent-spike/vllm-cache
+    # Hugging Face caches on scratch.
+    HF_HOME: /tmp/agent-spike/hf-home
+    # The session has no internet: no Hub lookups.
+    HF_HUB_OFFLINE: "1"
+    # Same, for transformers.
+    TRANSFORMERS_OFFLINE: "1"
+    # No usage reporting attempts in an offline session.
+    VLLM_NO_USAGE_STATS: "1"
+    # Same, for the libraries that read it.
+    DO_NOT_TRACK: "1"
+    # NCCL prints at init whether the GPUs talk by P2P or shared memory (models note, 4.3: P2P on
+    # Kaggle's L4 VM is unknown); a few hundred lines in the server log.
+    NCCL_DEBUG: INFO
+    # Triton's compile cache on scratch.
+    TRITON_CACHE_DIR: /tmp/agent-spike/triton-cache
+    # Inductor's compile cache on scratch.
+    TORCHINDUCTOR_CACHE_DIR: /tmp/agent-spike/inductor-cache
+  # Variables removed from the engine's environment: a TRITON_PTXAS_PATH pointing at the image's
+  # CUDA 12 ptxas (NVARC's launch line sets one) would compile Triton 3.7's newer PTX with an
+  # older assembler; Triton uses its bundled tools without them.
+  unset_env: [TRITON_PTXAS_PATH, TRITON_CUOBJDUMP_PATH, TRITON_NVDISASM_PATH]
+  # Seconds until /health answers: 304.1 s in P6.3-01's attempt 3 (weights 32.5 s, engine
+  # initialization 211.4 s), so 900 is about 3 times that; past it the run stops as a Fault. vLLM's
+  # own VLLM_ENGINE_READY_TIMEOUT_S above stays at 1,800 s (the engine's environment as measured);
+  # this limit ends the wait first.
+  boot_timeout_s: 900
+  # Seconds between SIGTERM and SIGKILL of the server's process group at the end.
+  stop_timeout_s: 60
+  # Seconds between samples of nvidia-smi and the server's /metrics.
+  sample_interval_s: 5
+
+# One request after boot that must come back sane before any measurement.
+sanity:
+  # Generated-token cap: a short thinking answer fits well under it.
+  max_tokens: 2048
+  # Low effort: brief thinking (the chat template's own instruction), to keep it short.
+  reasoning_effort: low
+
+# The agent on DEV40 (design note, 6.2, day 2), in development mode: tasks from the evaluation
+# challenges through P6.2's loader (demonstrations and test inputs only; it refuses solution
+# files); the solutions are read after every attempt has finished, for the score alone (BRIEF A0).
+agent:
+  # Competition data folder name: the files below are found under it.
+  competition: arc-prize-2026-arc-agi-2
+  # DEV40's tasks come from the public evaluation set (arc26.data, BRIEF B4).
+  challenges: arc-agi_evaluation_challenges.json
+  # Read once, after the attempts, to score them (arc26.evaluate); never shown to the agent.
+  solutions: arc-agi_evaluation_solutions.json
+  # The project's 40-task development subset (1 task = 2.5 points; noise floor 2 tasks).
+  subset: DEV40
+  # DEV40 tasks NVARC scored 0 on in P2.6-01 (reports/P2.8/P2.6-01.csv: no submitted attempt
+  # correct on any test output; 4 of them had no candidate at all): 29 of 40. P2.6-01 scored
+  # 10.5 of 40 on DEV40 (4a21e3da at 0.5, not listed). ADR-020's gate counts the solved ones.
+  nvarc_misses: [136b0064, 16de56c4, 195c6913, 20a9e565, 28a6681f, 332f06d7, 3e6067c3, 446ef5d2, 581f7754, 5961cc34, 64efde09, 7b5033c1, 80a900e0, 8698868d, 89565ca0, 9385bd28, a25697e4, b0039139, b10624e5, c7f57c3e, cbebaa4b, db695cfb, dbff022c, dd6b8c4b, dfadab01, e12f9a14, e3721c99, e376de54, f560132c]
+  # Attempts in flight at once (P6.2's run_tasks): the design's band (16 to 64) and the point
+  # P6.3-01 measured: 377 tokens per second steady at a 32k mean context, 535 at 8k.
+  concurrency: 32
+  # Tokens per attempt's context (P6.2's Budget.context_tokens): each reply's max_tokens is lowered
+  # so that an upper bound of the prompt plus the reply (plus a thinking reply's forcing reserve)
+  # fits; the first prompt is bounded by the server's count of it (vLLM's /tokenize, plus 64),
+  # or at one token per character if the count fails, later ones from the engine's counts. 32,768 is the longest context P6.3-01 measured whose rate at 32 requests clears 300
+  # (its Borderline row; revision 4 ran 397 and 437 tokens per second in its two phases). With
+  # reasoning kept, everything an attempt generates stays in its context, so an attempt generates
+  # at most 32,768 tokens minus its prompts and reports, about 22k on DEV40. Unchanged.
+  context_tokens: 32768
+  # P6.1's verifier processes: 16 checks at once for 32 attempts that each verify a few
+  # programs a minute; the host has 48 CPUs (MT-01), and each REPL takes one more process.
+  verifier_workers: 16
+  # Seconds per transform call in the verifier: P6.1's default (2 s), ample for numpy on 30x30.
+  call_timeout_s: 2.0
+  # Address-space limit of every REPL and program process in MiB: P6.1's default (2 GiB);
+  # 32 REPLs and 16 workers stay far under the host's 173 GiB.
+  memory_mb: 2048
+  # Seconds per REPL cell: P6.2's default (10 s), the design note's figure (5.1).
+  cell_timeout_s: 10.0
+  # The cap on a forcing turn's reply (P6.2's Budget.forcing_tokens): after a thinking reply ends
+  # at its cap, one call with thinking off asks for transform(grid) as one python block, the cut
+  # reasoning kept in the context. A program is 600 to 2,511 characters in revision 4 (its 3
+  # programs), under 700 tokens at about 4 characters a token, and its 41 visible answers were at
+  # most 4,302 characters but one; 4,096 holds a 16k-character answer. Every thinking reply
+  # leaves these tokens in the attempt's budget and, with the forcing message (at most 1,813
+  # characters) and 112 tokens of template slack, 6,021 in the context: a cut reply always gets
+  # its forcing turn.
+  forcing_tokens: 4096
+  # The engine's health also needs every agent phase whose deadline cancelled calls to have
+  # generated at least this many tokens per second of its wall time (finished attempts' tokens):
+  # one request alone decodes at 44 to 46 tokens per second (revision 4's preserve check: 4,096 in
+  # 88.7 to 89.9 s) and the phases ran at 397 and 437, so a phase with even one attempt in flight
+  # clears 10, and a hung engine (no read timeout: its calls end only at the deadline, as
+  # cancellations) does not. A stalled phase makes the engine unhealthy: the gate reads Fault,
+  # not Bad.
+  min_tokens_per_s: 10
+  # The same phases also stall when no call was answered in this many seconds before the phase
+  # ended (a hang after some progress). Near a phase's end fewer attempts share the engine, so a
+  # call runs faster than the 1,560 s a 19,392-token turn takes at 397 tokens per second shared by
+  # 32 (only at a phase's start do 32 calls begin together); at 32 in flight a call ends about
+  # every 50 s. 1,200 s (20 minutes) without an answered call while calls are in flight is a hang;
+  # a hang in a phase's last 20 minutes is missed, its earlier results stand.
+  stall_s: 1200
+  # The cascade (design note, 5.4): each phase attempts the tasks no earlier phase verified, the
+  # smallest first; phase 2 is shown phase 1's failed programs.
+  phases:
+    # Phase 1, every task: one attempt at low effort (arcprize: 22.8% at low), up to 3 thinking
+    # turns (forcing turns do not count), 16,384 tokens per thinking turn, 24,000 in all (design
+    # note, 5.5: 12k to 24k); all unchanged. Reasoning kept (revision 5): a cut turn's forcing
+    # turn continues from it. Turn 1 in the 32k context: the opening prompt is 2,494 to 7,291
+    # tokens (measured, revision 4's first calls), bounded by the server's count plus 64, so the
+    # context leaves 32,768 - (7,291 + 64) - 6,021 (the forcing reserve) = 19,392 up to 24,189,
+    # and 16,384 binds on all 40 tasks (with the count failing, the character bound, 7,598 to
+    # 12,380, would leave 14,367 to 19,149). Then the forcing turn (at most 4,096); 24,000 -
+    # 16,384 - 4,096 = 3,520 tokens, less the forced reply, are left for a short repair turn after
+    # the verifier's report, which the context allows too (about 32,768 - 4.3k - 16.4k - 1k - 2k -
+    # 6,021 = 3k on the median task).
+    # 60 minutes: 40 attempts of at most about 22k tokens, 880k, take about 2,200 s at revision
+    # 4's measured 397 tokens per second (its phase 1: 860,036 tokens in 2,166.8 s).
+    - {max_tokens: 16384, token_budget: 24000, rounds: 3, reasoning_effort: low, temperature: null, budget_s: 3600, preserve_thinking: true}
+    # Phase 2, the unverified: one attempt at xhigh (42.4% at xhigh), up to 4 thinking turns,
+    # 24,576 tokens per turn, 49,152 in all; all unchanged. Reasoning kept. Phase 2's opening also
+    # shows the task's last 2 failed programs with their reports (prompts.task_message): about
+    # 1,600 tokens each (estimate: revision 4's programs of 474 to 2,511 characters at about 3.5
+    # characters a token, reports of 696 to 2,998 characters, mostly digit rows at about one token
+    # a character, median 1,502), up to about 3,300. Turn 1 then gets 32,768 - 64 - 6,021 - the
+    # opening: 19,392 to 24,189 tokens without earlier programs, about 16,200 to 21,000 with two
+    # median ones (19,200 on the median task), about 12,800 to 17,600 with two of the largest
+    # (the 24,576 cap never binds); the character bound alone would have left 6,794 to 15,634
+    # (median 12,320) with two 1,000-character programs and no turn at all on 195c6913 and
+    # e3721c99 past about 8,500 characters. After turn 1 and its forcing turn the context leaves
+    # little or no repair turn; an attempt generates about 20k to 25k, so 49,152 never binds. 60 minutes: about 37
+    # attempts of at most 22k, 810k tokens, about 1,900 s at revision 4's 437 tokens per second
+    # (its phase 2: 1,572,864 tokens in 3,600 s), plus the last 5 attempts' start after the first
+    # 32 end.
+    - {max_tokens: 24576, token_budget: 49152, rounds: 4, reasoning_effort: xhigh, temperature: null, budget_s: 3600, preserve_thinking: true}
+
+# The forcing check (revision 5), before the agent's phases: on DEV40's smallest tasks, one P6.2
+# attempt each with the agent's own loop and engine: a thinking turn capped short enough to be
+# cut, then its forcing turn. It passes when enough forced replies hold a complete python block
+# defining transform, the forcing prompt grew by the cut reasoning's token count (kept), and the
+# chat template's rendering of the forcing prompt (vLLM's /tokenize) holds the reasoning closed
+# by </think> and ends with the empty think block. A failure records a Fault row and stops the
+# run before the agent's phases, which saves their quota (docs/prerun/P6.3-02.md, section 1).
+forcing:
+  # Tasks checked, all at once: DEV40's three smallest (the agent's own order), the preserve
+  # check's tasks (28a6681f, dbff022c, 7b5033c1).
+  n_tasks: 3
+  # Turn 1's cap: short enough to be cut, since a task whose turn 1 ends by itself tests no
+  # forcing turn and too few cut tasks would read a false Fault. Revision 4's preserve check cut
+  # all three of these tasks at 4,096 tokens of low-effort reasoning (3,943 to 4,096 of it
+  # reasoning), so a quarter of that is cut with a wide margin, and its reasoning is still 8
+  # times the tolerance, so a dropped reasoning shows.
+  turn1_max_tokens: 1024
+  # Phase 1's effort.
+  reasoning_effort: low
+  # Forced replies with a complete python block defining transform needed to pass: 2 of 3. One
+  # task may answer in prose; a broken thinking switch, template, or parser fails all three.
+  min_programs: 2
+  # Allowed difference in tokens between the forcing prompt's growth and the counts of the cut
+  # reasoning, turn 1's text, and the forcing message: the template's tags and role markers
+  # (about 15) and merges at the texts' edges; a dropped reasoning misses about 2,000.
+  tolerance_tokens: 64
+  # Seconds for the whole check (each call is cut at this deadline): turn 1's 1,024 tokens at one
+  # request's 44 to 46 tokens per second (revision 4's preserve check: 4,096 in 88.7 to 89.9 s)
+  # take about 25 s with three in flight, a forced reply of at most 4,096 about 100 s (a program
+  # of under 700 tokens about 15 s), the REPL, verifier, and /tokenize seconds: at most about
+  # 130 s, typically 45 s. 300 s leaves more than twice the worst case.
+  budget_s: 300
+
+# Degenerate outputs: the symptom of NaN logits or a broken kernel.
+degenerate:
+  # A run of this many identical consecutive tokens marks an output degenerate.
+  max_run: 64
+  # Token ids at or above this are special (generation_config.json: <|endoftext|> 248044,
+  # <|im_end|> 248046): runs of them after ignore_eos are not counted.
+  special_min_id: 248044
+  # End-of-sequence ids (generation_config.json: <|im_end|> 248046, <|endoftext|> 248044): runs
+  # are counted only before the first, since with ignore_eos a finished model keeps generating.
+  eos_ids: [248046, 248044]
+
+# Kill criteria, applied by the script itself (docs/prerun/P6.3-02.md, section 7).
+kill:
+  # More than this share of degenerate outputs in one cell or in the probe stops the run.
+  degenerate_share: 0.5
+  # More than this share of failed requests (HTTP or connection errors) in one cell or in the
+  # probe stops the run.
+  error_share: 0.5

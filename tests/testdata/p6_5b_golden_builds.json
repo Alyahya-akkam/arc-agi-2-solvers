@@ -1,0 +1,52 @@
+{
+ "commit": "dbbc7821e81dc734939b4dfd4dda80cb63bf7301",
+ "configs": {
+  "configs/submission_P6.5-01.yaml": {
+   "MANIFEST.md": "19aad808eae65fe5cd015e9066e79f0badcae0a61a706508d02e8e6a2a889573",
+   "arc26-code/dataset-metadata.json": "7bf62350e303c21df5843ecba35c561ceb44e1e40d2a043c6088009a3f441253",
+   "kaggle_submission.ipynb": "a8cc267a224e82e28d7c96731af80f3e11be9a603cd6a1c6dd9e9651cbbb19ea",
+   "kernel-metadata.json": "0e953b034efacf2a3688107b85a5fbd6133b524907dbfa6408afbba64dbf2893"
+  },
+  "configs/submission_P6.5-agent.yaml": {
+   "MANIFEST.md": "d779228867a0fac70b35201ee63cbae218fdda7e6e1e5b01b6bf7e7b19010226",
+   "arc26-code/dataset-metadata.json": "7bf62350e303c21df5843ecba35c561ceb44e1e40d2a043c6088009a3f441253",
+   "kaggle_submission.ipynb": "cb6cf83191eee61ef92b492551d1c519930ea8f3dd3356bd3b762eff4a88017e",
+   "kernel-metadata.json": "aef4322c06fc72d04f94dd9719f501eecb53e72c3bc71ccbe11deea268da5f88"
+  },
+  "configs/submission_P6.5-cpu.yaml": {
+   "MANIFEST.md": "9f92b234d6c195f2d23c59fb4e42692098509ceb3e3274769b9e3528bc872b6a",
+   "arc26-code/dataset-metadata.json": "7bf62350e303c21df5843ecba35c561ceb44e1e40d2a043c6088009a3f441253",
+   "kaggle_submission.ipynb": "9d73bfb277429d59984873f09dde4227a7c6a6f78d01ea7f914311d25f40bf3e",
+   "kernel-metadata.json": "439fb7707fa4f2474a794628a2714c173e8d453bbc9d9e83ed76d6acf580df80"
+  },
+  "configs/submission_P6.5-hybrid.yaml": {
+   "MANIFEST.md": "afb8fdf03954559ba4df6d1d8b12e597d5175b1cb0d6cbca9d19cac66f78a67c",
+   "arc26-code/dataset-metadata.json": "7bf62350e303c21df5843ecba35c561ceb44e1e40d2a043c6088009a3f441253",
+   "kaggle_submission.ipynb": "77525e5bd78de7efadb00629908fd6c9c79effd5660ef07259f3147654fc9275",
+   "kernel-metadata.json": "aef4322c06fc72d04f94dd9719f501eecb53e72c3bc71ccbe11deea268da5f88"
+  }
+ },
+ "inputs": {
+  "configs/submission_P6.5-01.yaml": {
+   "configs/agent_default.yaml": "fcb95707e77ea84361f4a2afc083e16552528995a5148de3e6e80aadeb053bee",
+   "configs/submission_P6.5-01.yaml": "dc54a7c277ed99221185d94603dcdd0b69eddb139c47a5d59db3817678585b29",
+   "reference/kernel-metadata.json": "b1d9ce0f7c0137db9e80a85b57f5721decc0bebf21847c13f275525137271c9a"
+  },
+  "configs/submission_P6.5-agent.yaml": {
+   "configs/agent_default.yaml": "fcb95707e77ea84361f4a2afc083e16552528995a5148de3e6e80aadeb053bee",
+   "configs/submission_P6.5-agent.yaml": "8af12c30a3a5114aa6fa4e7ad9ffebb94093413d82e8481d957f9fcb0939a39a",
+   "reference/kernel-metadata.json": "b1d9ce0f7c0137db9e80a85b57f5721decc0bebf21847c13f275525137271c9a"
+  },
+  "configs/submission_P6.5-cpu.yaml": {
+   "configs/agent_default.yaml": "fcb95707e77ea84361f4a2afc083e16552528995a5148de3e6e80aadeb053bee",
+   "configs/submission_P6.5-cpu.yaml": "12e8d8474f67173e286b0a1939ac437a164fa58d26d59a1a11057d8030355a41",
+   "reference/kernel-metadata.json": "b1d9ce0f7c0137db9e80a85b57f5721decc0bebf21847c13f275525137271c9a"
+  },
+  "configs/submission_P6.5-hybrid.yaml": {
+   "configs/agent_default.yaml": "fcb95707e77ea84361f4a2afc083e16552528995a5148de3e6e80aadeb053bee",
+   "configs/submission_P6.5-hybrid.yaml": "6f3239b6252b8215d79d00c2f036a85ec3ce5e1efa49a334f56a072321ad2063",
+   "reference/kernel-metadata.json": "b1d9ce0f7c0137db9e80a85b57f5721decc0bebf21847c13f275525137271c9a"
+  }
+ },
+ "note": "Digests of the P6.5 hybrid build configs' golden files (tests/test_shot_build.py's hybrid_golden_files) with the builders before task P6.5b"
+}

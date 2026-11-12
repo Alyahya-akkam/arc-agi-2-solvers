@@ -1,0 +1,55 @@
+# Script notebook build that repacks the weights notebook's output for the Modal fetch (task X2,
+# X2-01 attempt 5): Kaggle serves a single file of a notebook output without Range and cut the
+# 18.6 GB model.safetensors at most 6.9 GB in on each of 7 tries, each from byte 0, so fetch
+# downloads this notebook's output instead, part by part (modal_job.fetch_listed), and checks the
+# extracted folder file for file against the manifest this run writes in Kaggle's own session.
+# Read by scripts/build_submission.py and scripts/build_kaggle_notebook.py; runbooks
+# docs/runbooks/repack_output.md and docs/runbooks/build_submission.md (script mode). Named
+# outside configs/script_*.yaml, so the golden digests of the earlier script builds still cover
+# exactly their configs.
+
+# A script config: the notebook runs one script, never the solver, and is never submitted.
+kind: script
+
+# Its own notebook, <owner>/<slug>; its output version 1 is the Modal input
+# alyahya737/arc26-repack-qwen38-int4/versions/1 (configs/modal_X2-01.yaml). No brief names it.
+kaggle_notebook: alyahya737/arc26-repack-qwen38-int4
+
+# The install output's repack (configs/X2-repack-script.yaml) is done, so its code dataset has
+# no concurrent build and takes this build as a new version.
+code_dataset: alyahya737/arc26-code-repack
+
+# The same competition as every build; the script does not read it.
+competition: arc-prize-2026-arc-agi-2
+
+# No accelerator: a CPU session spends no GPU quota and needs no pre-run brief (BRIEF A9).
+accelerator: null
+
+# The same pinned image as every build.
+reference_metadata: reference/kernel-metadata.json
+
+# The reference's kernel source, as every build attaches it; the script does not read it.
+kernel_source_versions:
+  sorokin/pip-install-unsloth-flash-patch: 2
+
+# The same model folder name as every build (the environment check finds the model).
+model_slug: qwen3_4b_grids15_sft139
+
+# Standard library only: tar parts and a manifest of every file's size, sha256, and mode.
+script: scripts/repack_output.py
+
+# Its settings: the output folder, the part size, the parts' stem.
+script_config: configs/repack_qwen38_int4.yaml
+
+# The folder to repack: the attached weights output's mount, found in the session.
+args: ["--source", "{input:alyahya737/arc26-dl-qwen38-int4}"]
+
+# What this run repacks: the weights notebook's first output, the one P6.5-02 attached and the
+# Modal fetch pinned (configs/modal_X2-01.yaml before attempt 5).
+notebook_inputs:
+  alyahya737/arc26-dl-qwen38-int4: 1
+
+# Seconds after the notebook's start: the hard stop. The output is about 19.5 GB: two reads
+# (sha256 of every file, then the tar) and one write; the install output's 9.3 GB took 546 s
+# (X2-repack), so about 1,150 s; 5,400 s leaves more than four times that.
+script_kill_s: 5400

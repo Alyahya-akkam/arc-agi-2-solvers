@@ -1,0 +1,246 @@
+# Run P5.2-06 (task P5.2m, brief docs/prerun/P5.2-06.md): an engine bisect of version 11 on Modal's
+# 2 x L40S. P5.2-05 (configs/modal_P5.2-05.yaml) hit "an illegal memory access" on sm89 in both
+# boots (runs/P5.2-05/vol_fn/engine.log): boot 1 in the decode CUDA graph capture (reported at
+# fused_marlin_moe.py:423's torch.sum), boot 2 (BF16 KV, no graphs) after "Uvicorn running" at the
+# first prefill (reported while a Triton kernel loaded, elementwise.py:540). CUDA reports a fault
+# at a later call, so neither names the kernel. This config is version 11's (extends) with one
+# change of purpose: the notebook's cell 2 runs scripts/fn_bisect.py (entry), which installs
+# exactly as fn_probe.py does (fn_probe.py's own stages, its three hash-guarded edits) and then
+# boots each variant below with one tiny chat request instead of the solve. Runbook
+# docs/runbooks/fn_bisect.md. The job's overrides (TP 2, EP 2, the time plan) are in
+# configs/modal_P5.2-06.yaml.
+
+# Version 11 at P5.2-01 revision 9 (fix round G): every flag, variable, and edit the variants start
+# from. build_modal_job.probe_files merges this file over it (build_fn_notebooks.deep_merge).
+extends: configs/P5.2-01.yaml
+
+# The pre-run brief's Run-id (the job overrides it again, as every probe job does).
+run_id: P5.2-06
+
+# The notebook's cell 2 runs fn_bisect.py from the code dataset (build_modal_job.PROBE_ENTRIES adds
+# it to the code files and the build's sha256 check); fn_probe.py is unchanged beside it.
+entry: fn_bisect.py
+
+bisect:
+  # The stage runs only when on (fn_bisect.stage_bisect): a config without it skips.
+  enabled: true
+  # Seconds from a variant's launch to its request's end: the weights load in about 70 s from the
+  # volume (P5.2-05: 76.85 s and 61.01 s, "Load weight end"), then at most about 4 minutes for the
+  # warm-up, a graph capture, and the request (the orchestrator's per-variant limit). P5.2-05's
+  # boot 1 spent 4 min 32 s in its first capture shape before the fault, so a hang is cut here.
+  budget_s: 310
+  # A variant starts only with this much left before end_s: the load (about 70 s) plus the
+  # warm-up and the request's floor below; less would end in a boot_timeout that says nothing.
+  min_variant_s: 150
+  # The deadline sits this far before end_s: the stop of the server's group (SIGTERM, 60 s, then
+  # SIGKILL, fn_probe.kill_server) and the log reading fit before the notebook's own end.
+  kill_reserve_s: 75
+  # Seconds the stop waits for the variant's tagged processes to go and its port to free, so the
+  # next boot meets free GPUs.
+  stop_settle_s: 30
+  # The stop also waits until no GPU holds more than this many MiB above its reading before the
+  # launch (P5.2-06: V2's stop read 41,881 MiB still held 0.2 s after its kill); 2 GiB is above the
+  # CUDA context of a process that is going and far below a rank's 36 GB of weights.
+  gpu_free_mib: 2048
+  # Seconds between health polls (a crash shows within a second as the process's exit).
+  poll_s: 2
+  # Seconds after the request before the liveness check: P5.2-05's boot 2 died within 20 s of its
+  # first prefill, during a reply's first tokens; 3 s catches a fault the reply's last chunk hid.
+  settle_s: 3
+  # Flags and variables every variant adds before its own (none: each variant states all of its
+  # changes, so a row reads alone).
+  base_flags: {}
+  base_env: {}
+  # The one request: a chat request of a few hundred tokens with 64 new tokens (the orchestrator's
+  # spec), through the server's own template, so its prefill runs the GDN chunk kernels, the QSA
+  # path, and the Marlin MoE, and its 64 decode steps run the decode path.
+  request:
+    max_tokens: 64
+    # Greedy: the same tokens on every variant that survives.
+    body: {temperature: 0.0}
+    # Seconds for the request: 64 tokens take seconds even eager under CUDA_LAUNCH_BLOCKING; the
+    # Triton GDN kernels compiled in about 1.2 s each at the first prefill (P5.2-05 boot 2, 7
+    # compiles), so 120 s holds the compiles and the reply.
+    timeout_s: 120
+    # The boot's health wait ends this long before the variant's deadline, so a server that comes
+    # up late still gets its request and the rate request below (64 tokens in seconds, 512 in at
+    # most about 51 s, plus the settle).
+    min_s: 90
+    # About 330 tokens with Qwen's tokenizer (a 6 x 6 grid pair in digits and its instructions).
+    messages:
+      - role: user
+        content: "Each grid is rows of digits 0 to 9. In every example, the output grid is the input grid with every 1 replaced by 2.\n\nExample 1 input:\n0 0 1 0 0 1\n1 0 0 0 1 0\n0 1 1 0 0 0\n0 0 0 1 0 1\n1 1 0 0 0 0\n0 0 0 0 1 1\nExample 1 output:\n0 0 2 0 0 2\n2 0 0 0 2 0\n0 2 2 0 0 0\n0 0 0 2 0 2\n2 2 0 0 0 0\n0 0 0 0 2 2\n\nExample 2 input:\n1 1 0 0 1 0\n0 0 0 1 0 0\n1 0 1 0 0 1\n0 1 0 0 1 0\n0 0 1 1 0 0\n1 0 0 0 0 1\nExample 2 output:\n2 2 0 0 2 0\n0 0 0 2 0 0\n2 0 2 0 0 2\n0 2 0 0 2 0\n0 0 2 2 0 0\n2 0 0 0 0 2\n\nTest input:\n0 1 0 1 0 0\n1 0 0 0 0 1\n0 0 1 1 0 0\n1 0 0 0 1 0\n0 1 0 0 0 1\n0 0 1 0 1 0\nWrite the test output grid."
+  # For each variant that survives the request: one more request of 512 new tokens, whose decode
+  # rate (the server's own "gen throughput" lines, and the wall rate) and the KV pool
+  # (/get_server_info, read after the boot) tell which variant to ship (the orchestrator's ask).
+  rate:
+    enabled: true
+    max_tokens: 512
+    # All 512 tokens, whatever the model writes: the rate needs the count.
+    body: {temperature: 0.0, ignore_eos: true}
+    # 512 tokens at the eager path's slowest plausible 10 tokens per second (L4 estimates 29 to 41
+    # per stream with graphs, flash_next_shot.md section 3) is 51 s; 90 s holds it.
+    timeout_s: 90
+    # Not started with less than this before the variant's deadline (a cut reading says little).
+    min_s: 30
+  # Lines of each variant's tail log (pulled), and the bounded copy of its whole log (head and
+  # tail kept): P5.2-05's two boots wrote 231 KB in all, so 2 MB holds a whole boot.
+  tail_lines: 300
+  max_log_bytes: 2000000
+  # A fatal line (fn_bisect.first_error): the scheduler's traceback header, CUDA's and Triton's
+  # fault texts, torch's out-of-memory, NCCL's errors, a crash of the interpreter, argparse's
+  # refusal (a variant's flag the fork does not know).
+  error_patterns:
+    - "Scheduler hit an exception"
+    - "CUDA error"
+    - "illegal memory access"
+    - "Triton Error"
+    - "AcceleratorError"
+    - "CUDA out of memory"
+    - "NCCL error"
+    - "ncclInternalError|ncclUnhandledCudaError|ncclSystemError"
+    - "Fatal Python error"
+    - "Segmentation fault"
+    - "core dumped"
+    - ": error: argument"
+    - "^ValueError: "
+  # Never fatal: the fork's import of torchcodec without FFmpeg logs tracebacks at every start
+  # (P5.2-05's engine.log, lines 13 to 700).
+  ignore_patterns:
+    - "torchcodec"
+    - "libavutil"
+    - "Ignore import error"
+  # Frames that only dispatch a launch: the deepest frame outside these is the launching call.
+  kernel_frame_skip:
+    - "/torch/nn/modules/"
+    - "/torch/_ops.py"
+    - "/torch/utils/"
+    - "/torch/_compile"
+    - "/torch/_dynamo/"
+    - "/triton/runtime/"
+    - "/triton/compiler/"
+    - "/triton/backends/"
+    - "/contextlib.py"
+  # What each row reads from its log: the load's seconds, the pool, the server's start, a graph
+  # capture's start and end, the first prefill and decode lines.
+  log_marks:
+    load_s: "Load weight end\\. elapsed=([\\d.]+) s"
+    # The fork's line carries the dtype first ("KV Cache is allocated. dtype: torch.float8_e4m3fn,
+    # #tokens: 449024", P5.2-06), so the count follows anything on the line.
+    kv_tokens: "KV Cache is allocated\\.[^\\n]*?#tokens: (\\d+)"
+    uvicorn: "Uvicorn running"
+    graph_capture_begin: "Capture [a-z ]*CUDA graph begin"
+    graph_capture_end: "Capture cuda graph end"
+    prefill: "Prefill batch"
+    decode: "Decode batch"
+  # The variants, in the order of the research note (docs/research/fn_sm89_illegal_access.md on
+  # task/ideas, b2a5a9e) and the orchestrator's list. The note reads the fault from the fork's
+  # code: at EP > 1 the dispatcher marks the other rank's experts -1 (standard.py:186-237), the
+  # GPTQ Marlin MoE call passes no expert_map (gptq_kernels.py:369-382), so the kernel runs with
+  # is_ep off (fused_marlin_moe.py:323,386) and reads expert -1 as a real one, below the weight
+  # tensors (marlin_template.h:537-552). Each variant: name (file names), why, flags (on top of
+  # version 11's, which keep --disable-custom-all-reduce; null removes a flag), env (null removes
+  # one; {scratch} is the variant's local folder), edits (fn_probe.apply_patch items,
+  # hash-guarded, for this variant only, restored after it; version 11's three edits stay applied
+  # under all of them, the torch.sum one included, which the note finds harmless: no caller passes
+  # a routed_scaling_factor), run_if (always, or none_survived), logs (files whose bounded copies
+  # come back).
+  variants:
+    # V1: the note's edit with P5.2-05 boot 2's flags (BF16 KV, no CUDA graphs): the fix alone, on
+    # the path that faulted at the first prefill.
+    - name: v1_ep_mask_eager
+      why: the Marlin EP mask edit with BF16 KV and no CUDA graphs (P5.2-05 boot 2 plus the fix)
+      flags: &eager {--kv-cache-dtype: bfloat16, --cuda-graph-backend-decode: disabled,
+                     --cuda-graph-backend-prefill: disabled}
+      edits: &ep_mask
+        # Two anchored replacements in one file, each exact-once and hash-guarded; the second's
+        # sha256_before is the first's sha256_after (both computed on the fork's file at d00d88e,
+        # e1db2b78..., which the note read). The import is the dispatcher's own accessor
+        # (standard.py:34), inside fused_experts_none_to_marlin beside its other imports (line 123).
+        - name: marlin_ep_mask_import
+          file: sglang/srt/layers/moe/moe_runner/marlin.py
+          sha256_before: e1db2b78559fd7ed482710f0b95104339ebcd41721a3cb85e17fbc63ab683734
+          sha256_after: 09110ecb55c308d357886f90e2068535c971c3892de0099861d74b7e3e48150b
+          pattern: "(?m)^(    from sglang\\.srt\\.layers\\.quantization\\.marlin_utils import marlin_make_workspace\\n)"
+          replacement: "\\g<1>    from sglang.srt.runtime_context import get_parallel\\n"
+          count: 1
+        # Line 184: an empty expert_map whenever EP > 1 and none was passed. fused_marlin_moe only
+        # tests expert_map for None (lines 249, 323, 365, 386), so the empty tensor turns on is_ep
+        # (the kernel skips -1 blocks), zeroes intermediate_cache3 before GEMM 2 (line 365), and
+        # keeps EP off the single-token shortcut; at EP 1 the call is unchanged.
+        - name: marlin_ep_mask_map
+          file: sglang/srt/layers/moe/moe_runner/marlin.py
+          sha256_before: 09110ecb55c308d357886f90e2068535c971c3892de0099861d74b7e3e48150b
+          sha256_after: 86c0031252e00deebdedc25db8b8c8f1939ea6bcc858d04992ecb111e3640ae2
+          pattern: "(?m)^(        )expert_map=quant_info\\.expert_map,$"
+          replacement: "\\g<1>expert_map=(quant_info.expert_map if quant_info.expert_map is not None or get_parallel().moe_ep_size == 1 else topk_output.topk_ids.new_empty(0)),"
+          count: 1
+    # V2: the same edit on version 11's own target settings: FP8 KV (the FA2 scratch edit applied)
+    # and the decode CUDA graphs at batch 1 to 8, whose capture runs the same Marlin call on the
+    # dual stream (qwen2_moe.py:605-640). No flags: version 11's as they are.
+    - name: v2_ep_mask_fp8_graphs
+      why: the Marlin EP mask edit on version 11's target settings (FP8 KV, decode CUDA graphs)
+      edits: *ep_mask
+    # V3: no edit, EP off. At TP 2 each expert's shard is 320 wide, not a multiple of 128, so
+    # check_moe_marlin_supports_layer refuses Marlin and AutoRound falls back to MoeWNA16
+    # (auto_round.py:545-556), the Triton int4 fused_moe, where no expert id is ever -1; the same
+    # weight bytes per GPU. FP8 KV and graphs on (the orchestrator's setting). The fallback if the
+    # edit does not apply; a slower MoE, untuned on sm89.
+    - name: v3_ep1_triton_moe
+      why: no edit, --expert-parallel-size 1 (AutoRound falls back to the Triton MoeWNA16 MoE), FP8 KV, graphs on
+      flags: {--expert-parallel-size: 1}
+    # V4: only if V1 to V3 all fail, the pin run of the note: the edit, BF16 KV, no graphs, one
+    # stream (--disable-overlap-schedule), synchronous launches (CUDA_LAUNCH_BLOCKING=1), and the
+    # fork's kernel API log (one line per @debug_kernel_api call, kernel_api_logging.py:55-56;
+    # %i the process), so the traceback stops at the faulting launch and the log's last line names
+    # it. The log is written to the variant's local folder; its bounded copy comes back.
+    - name: v4_pin_blocking
+      why: only if V1 to V3 fail, the edit with CUDA_LAUNCH_BLOCKING=1, the kernel API log, one stream, to name the kernel
+      run_if: none_survived
+      flags: {--kv-cache-dtype: bfloat16, --cuda-graph-backend-decode: disabled,
+              --cuda-graph-backend-prefill: disabled, --disable-overlap-schedule: true}
+      env: {CUDA_LAUNCH_BLOCKING: "1", SGLANG_KERNEL_API_LOGLEVEL: "1",
+            SGLANG_KERNEL_API_LOGDEST: "{scratch}/kapi_%i.log"}
+      edits: *ep_mask
+      logs: ["{scratch}/kapi_*.log"]
+
+smoke:
+  # The fake server's variants, one per path of fn_bisect.run_variant: a survivor with its rate
+  # request (the run's V1 flags, a variable set), a flag the fake refuses (argparse's exit at
+  # boot), a boot that never becomes healthy (cut at its deadline), the run's EP mask edit with no
+  # venv to edit (refused before any boot: the smoke never edits its interpreter), a variable
+  # removed and another set (a second survivor), and the run's pin variant (not run: a variant
+  # survived). Short budgets: the fake boots in 0.3 s.
+  bisect:
+    budget_s: 8
+    min_variant_s: 4
+    kill_reserve_s: 2
+    stop_settle_s: 5
+    poll_s: 0.2
+    settle_s: 0.2
+    request: {max_tokens: 64, body: {temperature: 0.0}, timeout_s: 5, min_s: 3,
+              messages: [{role: user, content: "Each grid is rows of digits. 0 1\n1 0"}]}
+    rate: {enabled: true, max_tokens: 512, body: {temperature: 0.0, ignore_eos: true},
+           timeout_s: 5, min_s: 1}
+    variants:
+      - name: s0_survives
+        why: the run's V1 flags and CUDA_LAUNCH_BLOCKING on the fake server
+        flags: *eager
+        env: {CUDA_LAUNCH_BLOCKING: "1"}
+      - name: s1_refused_flag
+        why: the fake's argparse refuses the value, as the fork would an unknown flag
+        flags: {--fake-pool: not-a-number}
+      - name: s2_never_healthy
+        why: a boot that outlasts its deadline, as P5.2-05's capture hang
+        flags: {--boot-delay: 60}
+      - name: s3_edit_without_venv
+        why: the run's EP mask edit, refused without a venv
+        edits: *ep_mask
+      - name: s4_env_removed
+        why: a variable removed and another set, a second survivor
+        env: {NCCL_DEBUG: null, NCCL_P2P_DISABLE: "1"}
+      - name: s5_pin_not_needed
+        why: the run's pin variant, skipped because a variant survived
+        run_if: none_survived
+        env: {CUDA_LAUNCH_BLOCKING: "1", SGLANG_KERNEL_API_LOGDEST: "{scratch}/kapi_%i.log"}
+        logs: ["{scratch}/kapi_*.log"]

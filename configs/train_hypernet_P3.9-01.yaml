@@ -1,0 +1,262 @@
+# Training config of run P3.9-01 (task P3.9, docs/tasks/P3.9.md): H trained for the start of the
+# fine-tuning with the fomaml objective (first-order MAML, k = 2 inner steps), warm-started with
+# --init-from from MT-03's last full checkpoint (ckpt-004180.pt in alyahya737/arc26-mt-train-2
+# version 1), on Modal (4 x L4). The inner rate is chosen at the start step by inner_probe.
+# Read by scripts/train_hypernet.py inside the Modal job configs/modal_P3.9-01.yaml
+# (scripts/build_modal_job.py, scripts/modal_ops.py); runbooks docs/runbooks/train_hypernet.md and
+# docs/runbooks/modal_ops.md, pre-run brief docs/prerun/P3.9-01.md. Every RESUME_KEYS value but
+# the objective and schedule keys equals configs/train_hypernet_MT.yaml's, which --init-from
+# compares; the objective, the inner loop, the paths, the cadence, the budget, and the kill
+# criteria are this run's.
+
+# Logs and summary.md name this run and its brief.
+run_id: P3.9-01
+
+# The Modal job passes the fetched path of P3.4's build as --episodes-root; never used there.
+episodes_root: /vol/inputs
+
+# Builder v2's manifest, as MT-02 and MT-03: --init-from refuses a checkpoint written under
+# another one.
+manifest_sha256: b1f2cd0413efdbe8d00152dd98e76181556907f22477e3079cc07746ad8b7aa8
+
+# The job passes the fetched leakage report's folder as --check-root.
+check_root: /vol/inputs
+
+# MT's splits: the pool, and the 286 validation episodes on which MT-03's H is the pilot's
+# paired reference (its post-k metrics at the start step).
+train_split: train
+val_split: val
+
+# As MT (a RESUME_KEYS value, compared by --init-from).
+max_tokens: 8192
+
+# As MT (ADR-006 amendment; a RESUME_KEYS value). The inner steps' targets follow it: each
+# demonstration's grid and its closing <|im_end|>, the notebook fit's completion-only labels.
+loss_includes_eos: true
+
+# MT's model id; the embedding cache was written under it.
+model_id: sorokin/qwen3_4b_grids15_sft139/Transformers/bfloat16/1
+
+# The job passes the fetched model folder as --model-dir.
+model_dir: /vol/inputs/model
+
+# One GPU per process.
+device: cuda
+
+# As MT: the frozen base in bf16, H, the factors, and the inner loop in fp32.
+dtype: bfloat16
+
+# FlashAttention 2 when flash_attn imports, as MT ran; run.json names the kernel used.
+attn_implementation: auto
+
+# As MT: non-reentrant checkpointing, which torch.autograd.grad of the inner steps needs (the
+# reentrant form supports .backward only); each inner step's forward and backward run inside one
+# inject block, so the recompute sees that step's factors (research note, risk 2).
+gradient_checkpointing: true
+
+# MT's encoder, the cache's namespace (a RESUME_KEYS value).
+encoder:
+  # L = 24 of 36 (Q1).
+  layer: 24
+  # Output-grid pooling (Q1).
+  pool: output
+  # 8 views (P3.2-02).
+  n_perm: 1
+  # The decode path's augment seed (P3.2-02).
+  view_seed: 2
+  # Prefill batch for pairs the cache lacks (none: MT read all 208,030 from it).
+  batch_tokens: 16384
+  # Pairs per encode call, as MT-01.
+  chunk_pairs: 256
+
+# The job passes the fetched cache as --embedding-cache.
+embedding_cache: /vol/inputs/embedding_cache
+
+# MT's mean H, equal to configs/hypernet.yaml without the aggregator: --init-from loads MT-03's
+# weights, all of them (the warm start changes the objective and adds nothing).
+hypernet:
+  embed_dim: 2560
+  latent: 512
+  head_in: 384
+  dropout: 0.05
+  rank: 16
+  alpha: 32
+  target_modules: [q_proj, k_proj, v_proj, o_proj]
+  seed: 0
+
+# Four processes, one per L4: a RESUME_KEYS value; --init-from refuses another world size.
+gpus: 4
+
+# As MT: 32 episodes per optimizer step (a RESUME_KEYS value).
+accum: 8
+
+# A new objective is a new training phase (orchestrator, 18 Oct): H's weights from MT-03's step
+# 4,180 with fresh AdamW moments and a new warmup and cosine. Continuing MT's cosine would train
+# at 15.8% of the peak (6.3e-6), falling to min_lr, and barely move H in a 1 h pilot.
+fresh_schedule: true
+
+# The phase runs global steps 4,181 to 4,260 (80 steps, 2,560 episodes); the logged step continues
+# MT-03's, the schedule counts from the phase start. 80 steps is what about 1 h holds at about
+# 28.4 s per step on Modal's 4 x L4 (see max_wall_s).
+steps: 4260
+# MT-02's peak (D2L's, research note 1.4), the rate H was trained at.
+lr: 4.0e-5
+# MT's minimum, reached at the phase's last step.
+min_lr: 1.0e-7
+# The orchestrator's 50 steps: fresh moments need a ramp before the peak; with 80 phase steps the
+# cosine then covers the last 30.
+warmup_steps: 50
+
+# As MT (RESUME_KEYS values).
+weight_decay: 0.01
+betas: [0.9, 0.999]
+eps: 1.0e-8
+clip: 1.0
+penalty: none
+penalty_weight: 0.0
+kl_weight: 0.0
+seed: 0
+source_weights:
+  arc2train: 0.20
+  barc: 0.65
+  rearc: 0.15
+
+# P3.9: the query CE after k inner steps from H's adapter, its gradient applied at H's adapter
+# (first-order MAML; survey sections 2, 9.4, 11a item 5; ADR-006 amendment 2).
+objective: fomaml
+
+# The inner loop, shaped like the notebook's fit (arc26/nvarc/arc_solver.py, worker: AdamW
+# adamw_torch, lr 5e-5, cosine, 10% warmup, no weight decay, one view per step, rsLoRA r 16,
+# alpha 32), at a k-step scale.
+inner:
+  # The task brief's pilot: k = 2 (survey 10: (1 + 0.716 k) episode costs, 27.8 s per step at
+  # MT's 11.42 s; one step tests direction at 19.6 s, two let Adam's second step use a moment).
+  steps: 2
+  # The survey's fallback (11a item 5): the fit's per-coordinate displacement bound, the sum of
+  # its learning rates over 128 steps, about 128 x 2.5e-5 = 3.2e-3, split over k = 2. Adam's
+  # first step moves every value by the full rate whatever the gradient's scale, so the rate is
+  # not trusted: it is the middle of inner_probe's rates, and the run trains at the probe's pick.
+  lr: 1.6e-3
+  # Adam-like, bias-corrected, moments fresh per episode: the fit's optimizer, so the start is
+  # trained for the kind of step it will meet.
+  optimizer: adam
+  # adamw_torch's defaults, the fit's.
+  betas: [0.9, 0.999]
+  eps: 1.0e-8
+  # One view per inner step, drawn per episode from the build's 8,192 augmentations (1,024 color
+  # permutations x 8 dihedral maps, configs/episodes.yaml), as the fit takes one view per step;
+  # the query stays under the episode's own view a.
+  views: drawn
+  # The fit's clip: the notebook's Trainer clips each step's gradient norm at 1.0
+  # (max_grad_norm in arc26/solver.py). Adam's first step is sign(g) at any clip, but its second
+  # weighs g_0 and g_1 by their clip factors, so the start meets the fit's kind of step.
+  clip: 1.0
+
+# The inner rate, judged by the pilot before it trains (task brief, P3.9-01): at the start step,
+# MT-03's H is scored after its 2 inner steps at each rate, a factor of 4 apart around the
+# survey's 1.6e-3 (Adam moves every value by about the rate per step); the run trains at the
+# rate with the lowest mean S among those within margin episodes of the most post-k greedy exact
+# matches (choose_inner_lr; ties to the smaller rate). Each rate costs one post-k validation,
+# about 311 s on 4 L4 (measured in attempt 1, see max_wall_s).
+inner_probe:
+  lrs: [4.0e-4, 1.6e-3, 6.4e-3]
+  # 2 of the 286 episodes (0.7 points): the project's noise rule for exact matches (2 tasks).
+  margin: 2
+
+# Not a training setting. Validations at the start step 4,180 (with the probe) and at the end,
+# 4,260, only: no multiple of 1,000 lies between them. A k = 2 validation scores the 286
+# episodes at 0 steps (two references, 77 s on Modal's 4 x L4, X1-01; three at the start, since
+# MT-03's checkpoint lacks the zero adapter's exact matches) and after 2 inner steps (about
+# 311 s, measured, see max_wall_s). A middle one would cost about 383 s (0.42 USD) and is not
+# needed for the paired start-to-end comparison.
+eval_every: 1000
+
+# A full checkpoint every 50 global steps (4,200, 4,250), at the end, and at the start step
+# after the probe (so a restart resumes at the picked rate): at most about 24 minutes of k = 2
+# training is lost to a failure. Two kept, as MT.
+ckpt_every: 50
+keep_checkpoints: 2
+
+# The job passes the volume's run folder as --ckpt-dir and --out-dir.
+ckpt_dir: /vol/runs/P3.9-01/checkpoints
+out_dir: /vol/runs/P3.9-01/run_logs
+
+# About 65 min, from attempt 1's measurements on Modal's 4 x L4 (timing-rank<k>.jsonl, 18 Oct)
+# where it has them: setup about 120 s; the start validation 107 s at 0 steps (three references,
+# the slowest rank) plus three post-k validations of 72 episodes x 4.32 s = 311 s each (the
+# slowest rank: an inner step 0.83 ms a token, validation's demonstrations about 2,000 tokens),
+# 1,040 s; 80 steps at 2.432 x 11.66 = 28.4 s (survey 10's cost model on X1-01's step, the
+# conservative end; attempt 1's token rates give 22.6 s), 2,272 s; the end validation 383 s; four
+# checkpoints and the summary about 56 s: about 3,870 s. 4,200 s leaves 330 s, enough for steps
+# up to 32.5 s; the job passes the value as --max-wall-s, capped by its ledger.
+max_wall_s: 4200
+
+# Kill criteria, from MT's measured step scaled to the inner loop's cost; the script enforces them.
+kill:
+  # MT's 150 s scaled by k = 2's cost, 1 + 0.716 x 2 = 2.43 (survey 10): about 365, rounded down;
+  # still twice the slowest legitimate step (MT's 72 s calibrated, times 2.43, 175 s).
+  max_step_s: 350
+  # Just under the session budget: a run projected past 4,150 s (steps over about 31.9 s) would
+  # stop at max_wall_s before its end validation, the pilot's measurement, so it is killed at
+  # step 4,220 instead (with a checkpoint) and spends about 1,600 s less of the human's credit.
+  max_projected_s: 4150
+  # The projection after 40 of the phase's 80 steps (a mean over a fair sample of steps).
+  projection_after_steps: 40
+
+# --smoke runs these settings on the CPU with the RESUME_KEYS values of
+# configs/train_hypernet_MT.yaml's smoke, so --init-from from that smoke's checkpoint passes the
+# warm start's checks as the pilot's does from MT-03's.
+smoke:
+  # Keeps these outputs apart from the other configs' smokes.
+  run_id: P3.9-smoke
+  # The fixture build and its synthetic check report (paths from the repository root).
+  episodes_root: tests/testdata/train_hypernet/episode_build
+  manifest_sha256: 15317ba48d7efefab0b37aaa69727454cb3fd71141140a1cd1d018c4013b0550
+  check_root: tests/testdata/train_hypernet/check
+  # The fixture has no train split; its toy split stands in.
+  train_split: toy
+  # The tiny random Qwen3 and the stand-in tokenizer, built in code.
+  model_id: smoke/tiny-random-qwen3
+  model_dir: null
+  # CPU only (BRIEF A0), fp32, SDPA.
+  device: cpu
+  dtype: float32
+  attn_implementation: sdpa
+  # No cache: the smoke encodes the fixture's pairs itself.
+  embedding_cache: null
+  # The MT smoke's encoder.
+  encoder:
+    layer: 2
+    batch_tokens: 4096
+    chunk_pairs: 4
+  # The MT smoke's widths.
+  hypernet:
+    embed_dim: 64
+    latent: 32
+    head_in: 16
+  # The MT smoke's processes, accumulation, and schedule: a warm start from its step-8
+  # checkpoint runs a phase of 4 steps with a warmup of 2.
+  gpus: 2
+  accum: 2
+  steps: 12
+  lr: 3.0e-3
+  min_lr: 1.0e-4
+  warmup_steps: 2
+  # A larger inner step, so the tiny base's adapter moves visibly in two steps.
+  inner:
+    lr: 1.0e-2
+  # The probe around the smoke's rate, a factor of 4 apart as the pilot's.
+  inner_probe:
+    lrs: [2.5e-3, 1.0e-2, 4.0e-2]
+  # Validation and checkpoints every 4 steps, as the MT smoke.
+  eval_every: 4
+  ckpt_every: 4
+  # Outputs under runs/, which git ignores.
+  ckpt_dir: runs/P3.9-smoke/checkpoints
+  out_dir: runs/P3.9-smoke/run_logs
+  # Generous limits for a CPU run of seconds.
+  max_wall_s: 600
+  kill:
+    max_step_s: 60
+    max_projected_s: 600
+    projection_after_steps: 4

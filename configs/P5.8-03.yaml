@@ -1,0 +1,28 @@
+# Schema-forced answers and a bounded memory adjustment; no other model/budget change.
+extends: configs/P5.8-02.yaml
+run_id: P5.8-03
+kernel:
+  id: alyahya737/arc26-p58-schema
+  title: arc26 p58 schema
+  code_dataset: alyahya737/arc26-code-fn-p583
+  timeout_s: 7500
+inputs:
+  code:
+    path: /kaggle/input/datasets/alyahya737/arc26-code-fn-p583
+    hint:
+    - arc26-code-fn-p583
+engine:
+  flags:
+    --mem-fraction-static: 0.948
+tool:
+  loop:
+    structured_forcing: true
+schema_check:
+  enabled: true
+  timeout_s: 600
+smoke:
+  schema_check:
+    enabled: false
+  tool:
+    loop:
+      structured_forcing: true

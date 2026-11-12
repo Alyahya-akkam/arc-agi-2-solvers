@@ -1,0 +1,78 @@
+# Submission notebook build for run P2.6-01: Submission 2 (BRIEF B5 P2.6, ADR-018), the DEV120
+# development run on 4xL4 of the build the human then submits. P1.1-01's config (the DEV120 run
+# of Submission 1's notebook) with one change of what is computed: rank 16 LoRA factors on q, k,
+# v, o with embed_tokens and lm_head frozen (P1.3-01 arm 2's scope, r16-attn), in both modes. No
+# hold-out and no refinement loop: P2.5-02 measured the loop as a Loss on DEV40 (7.0 of 40
+# against 10.5), so the loop stays out until a fix is measured. Read by
+# scripts/build_submission.py and scripts/build_kaggle_notebook.py with yaml.safe_load; runbook
+# docs/runbooks/build_submission.md (scope); pre-run brief docs/prerun/P2.6-01.md. Fit to submit:
+# the submission notebook, four workers on NvidiaL4, no series; a competition rerun of the
+# version this run makes trains the same scope.
+
+# The one notebook submissions come from (docs/SUBMITTING.md): this run's version is the one the
+# human submits, as P1.1-01's was Submission 1's candidate. The P2.6-01 pre-run brief names it, so
+# the gateway refuses CPU pushes to it.
+kaggle_notebook: alyahya737/arc26-submission
+
+# This build's own private code dataset (the orchestrator's lesson of 3 Oct, docs/STATE.md): runs
+# queued on other branches version alyahya737/arc26-code, so a shared dataset would make this run
+# wait for their wheel checks; created from this build's arc26-code/ folder. A competition rerun
+# reads the version attached to the submitted notebook version.
+code_dataset: alyahya737/arc26-code-p26
+
+# Competition attached: it mounts the data, and only notebooks attached to it get 4xL4.
+competition: arc-prize-2026-arc-agi-2
+
+# 4xL4, bf16 (the solver needs it), the hardware of the scored rerun and of P1.1-01 and P1.3-01,
+# whose timings the brief's estimates use; no fallback (NvidiaL4X1 is not granted, T4 has no
+# bf16).
+accelerator: NvidiaL4
+
+# Same pinned image and install notebook source as every build (ADR-010).
+reference_metadata: reference/kernel-metadata.json
+
+# Same install notebook version as every build (see configs/submission_P0.5-01.yaml).
+kernel_source_versions:
+  sorokin/pip-install-unsloth-flash-patch: 2
+
+# Same model folder name as every build (K0).
+model_slug: qwen3_4b_grids15_sft139
+
+# DEV120: every task of the public evaluation set (BRIEF B4), 120 tasks and 172 test inputs (K0),
+# P1.1-01's tasks, so the score compares with its 37.17 of 120 task for task (B5 P2.6's bar).
+subset: null
+
+# One worker per L4, as P1.1-01 and the scored rerun (production: submission_blocker).
+workers: 4
+
+# Same PYTHONHASHSEED as P1.1-01 and every run since run A: one fixed seed for all comparisons
+# (CLAUDE.md; B5 P2.6: "over P1.1 at the same seed").
+hash_seed: 0
+
+# The run solves DEV120 once.
+run_solver: true
+
+# Seconds after the start: the workers' soft deadline, equal to the notebook's competition value
+# (12 h minus 30 min), as P1.1-01, so this development run measures the timing of the scored
+# rerun.
+solver_end_s: 41400
+
+# Seconds after the start: the hard stop, equal to the competition value (12 h minus 20 min), as
+# P1.1-01. The brief's Timeout is 43,200 s, Kaggle's maximum, to leave the write its 20 minutes.
+solver_kill_s: 42000
+
+# The split solver (ADR-011, the default since 2 Oct), stated so this config keeps building what
+# ran: P2.1-03 found its training tokens, decode views and prompts, rescoring, and memory equal to
+# the moved reference's on DEV40, its score difference within the reference's run-to-run spread.
+solver: split
+
+# The LoRA scope of the run, in both modes (task P2.6, ADR-018; builder key scope): P1.3-01 arm 2
+# (r16-attn) scored 10.5 of 40 on DEV40 against 8.5 for the notebook configuration, at 490 s per
+# puzzle against 606 s (ADR-002, confirmed at G2), so it gains time on a 240-task rerun
+# (P1.1-01 projects u of about 0.91 for the notebook configuration).
+scope:
+  # Rank 16, rsLoRA scale alpha / sqrt(r) = 32 / 4 = 8 (the reference's alpha of 32).
+  lora_r: 16
+  # q, k, v, o on all 36 layers, 11,796,480 factor values; embed_tokens and lm_head are not
+  # listed, so they stay frozen (P1.3-01 arm 2, H's scope).
+  lora_targets: [q_proj, k_proj, v_proj, o_proj]

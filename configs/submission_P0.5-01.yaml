@@ -1,0 +1,74 @@
+# Submission notebook build for run P0.5-01: the DEV4 smoke of the P0.5 notebook on 4xL4, which is
+# also P0.1's GPU parity check (docs/tasks/P0.5.md; flagged conflict 2 in docs/STATE.md). Read by
+# scripts/build_submission.py and scripts/build_kaggle_notebook.py with yaml.safe_load; a missing,
+# unknown, or to-do value refuses the build. Runbook: docs/runbooks/build_submission.md. "Run A" is
+# run A of P0.1-01 (docs/experiments/P0.1.md): the parity check must repeat its image, install
+# notebook, accelerator, and hash seed. The subset, run_solver, and the two deadlines apply to
+# development runs only: a competition rerun of this version solves every test task with the
+# notebook's fixed deadlines (12 h minus 30 and minus 20 minutes), so it can be submitted.
+
+# Kaggle notebook the build pushes to, <owner>/<slug>. The owner is KAGGLE_OWNER in
+# scripts/kaggle_ops.py (human, 30 Sep); the slug is the orchestrator's default name for B3 (the
+# human may rename it). This is the GPU notebook: the P0.5-01 pre-run brief names it, so the
+# gateway refuses CPU pushes to it.
+kaggle_notebook: alyahya737/arc26-submission
+
+# Private dataset that holds the arc26 wheel, <owner>/<slug> (orchestrator default for B3). Only
+# this wheel is uploaded (ADR-010).
+code_dataset: alyahya737/arc26-code
+
+# Competition attached (competition_sources): it mounts the data, and only notebooks attached to
+# it get 4xL4 (research note, section 2). Slug confirmed by K0 (docs/experiments/K0.md).
+competition: arc-prize-2026-arc-agi-2
+
+# 4xL4, the accelerator of run A and of the scored rerun. Dev runs normally take a quick-starting
+# accelerator (CLAUDE.md), but the parity check must repeat run A's hardware, and the solver runs
+# one worker per GPU. The pre-run brief names the fallback and the 30-minute queue limit.
+accelerator: NvidiaL4
+
+# Pulled metadata of the reference notebook. The builder copies its pinned Python 3.11 image and
+# its model source from it, as scripts/build_reference_run.py did for run A (ADR-010).
+reference_metadata: reference/kernel-metadata.json
+
+# Version pin of the install notebook, which the pulled metadata attaches without a version.
+# Version 2 is the install run the reference used (unsloth 2025.9.7, flash-attn 2.8.2, torch 2.8)
+# and the one run A attached; configs/reference_run.yaml records the evidence.
+kernel_source_versions:
+  sorokin/pip-install-unsloth-flash-patch: 2
+
+# Folder name of the base model: the notebook takes the config.json below a folder of this name
+# as the model directory (K0: models/sorokin/qwen3_4b_grids15_sft139/transformers/bfloat16/1/).
+model_slug: qwen3_4b_grids15_sft139
+
+# DEV4, the reference's four development tasks and the parity fixture's (BRIEF B4; 5 test
+# outputs). Quoted so YAML never reads an id as a number. Development runs only: a competition
+# rerun always solves every test task.
+subset: ["0934a4d8", "36a08778", "981571dc", "aa4ec2a5"]
+
+# One worker per L4, as in run A (the reference's hardcoded 4).
+workers: 4
+
+# PYTHONHASHSEED of the solver, as run A's prepended cell set it: the reference seeds its
+# rescoring augmentations with hash(), so the parity check needs the same value (conflict 5).
+hash_seed: 0
+
+# The smoke runs the solver: this run is the moved code's GPU parity check.
+run_solver: true
+
+# Seconds after the notebook's start, development runs only: the solver's --end-time, after which
+# the workers start no new task and stop decoding. Run A's session took 1568 s (run B 1689 s), so
+# 3600 s is more than twice that and never binds on a healthy run. Parity holds because run A's
+# own end time (12 h minus 600 s) never bound either.
+solver_end_s: 3600
+
+# Seconds after the start, development runs only: the hard stop, when run_solver kills the
+# solver's process group. It is 900 s after the soft deadline, above run A's longest TTT training
+# (831 s), so the workers stop on their own first. The P0.5-01 brief's Timeout must be at least
+# 5400 s (this plus 900 s), so a hung solver still leaves time to write submission.json and
+# run_logs.
+solver_kill_s: 4500
+
+# The solver's code (task P2.0, ADR-011): this run ran the moved reference (python -m
+# arc26.nvarc.starter), the default until the split solver passed run P2.0-01 and the default
+# flipped to "split" (2 Oct); the key, added then, keeps this config what ran.
+solver: nvarc

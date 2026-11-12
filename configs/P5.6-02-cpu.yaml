@@ -1,0 +1,103 @@
+# The CPU twin of P5.6-02 (task P5.6): P5.2-01-cpu's twin (configs/P5.2-01-cpu.yaml, copied
+# with this run's ids) on P5.6-02's config, so the install, the fourteen edits, the import check,
+# and the argument check of its flags run on Kaggle's CPU with the real wheelhouse before the GPU
+# run. Its fake server stands in for the engine; the sweep runs on it.
+# The CPU twin of version 11 (P5.2-01-cpu; task P5.2, round 2): the same notebook, code dataset,
+# inputs, offline install, guarded edit, tool self-test, solve loop, submission writer, and final
+# check as configs/P5.2-01.yaml, with the fake SGLang server (scripts/fn_fake_sglang.py) in place
+# of the GPU engine, on a free CPU session (no brief). The fake uses the model's own tokenizer and
+# chat template, so the prompts, the token-exact continuations, and the parser run as on the GPU.
+# scripts/build_fn_notebooks.py merges this file over the one it extends (mappings key by key,
+# other values replaced).
+extends: configs/P5.6-02.yaml
+
+run_id: P5.6-02-cpu
+
+kernel:
+  # Its own slug: the gateway refuses a CPU push to a briefed notebook (arc26-submission), and
+  # version 10's twin keeps arc26-submission-cpu-check.
+  id: alyahya737/arc26-fn-8b-cpu
+  title: arc26 fn 8b cpu
+  # No accelerator: a free CPU session; internet stays off, as in a scored rerun, so the
+  # install is checked offline.
+  accelerator: null
+  # The plan may run to end_s 8,500 s (below); 9,400 leaves 900 s for the time before the first
+  # cell (P5.1-01: 334 s) and the save. A CPU session is free; the fake's solve ends in minutes
+  # once the install is done, so a usual twin still takes about 20 to 30 minutes.
+  timeout_s: 9400
+
+# Development mode, as the version's own GPU run.
+mode: development
+
+time_plan:
+  development:
+    # The worst case before the solve: the wheel copy's 1,800 s (local_inputs.max_s), python's
+    # 200, the install's commands' 5,520 (the lock 3,600), the argument check's 600: 8,120.
+    # Twin 6 passed the old 3,000 s inside the install alone. The fake's solve ends when its 6
+    # attempts do, so these bound only a slow session.
+    generation_stop_s: 8200
+    end_s: 8500
+    # The fake answers in seconds: every queued task starts.
+    min_start_s: 1
+
+# No parallel model reads: nothing loads the weights here.
+precache:
+  enabled: false
+
+engine:
+  # The fake server beside fn_probe.py in the code dataset, in place of sglang.launch_server.
+  module: null
+  script: fn_fake_sglang.py
+  # The fake is up in seconds.
+  boot_timeout_s: 600
+  poll_s: 1
+  # No second boot (null replaces the base's mapping): the fake has no FP8 path to fall back
+  # from.
+  boot_retry_flags: null
+  # Nor the GPU run's boot ladder (revision 17): the fake has no KV4 path to fall back from.
+  boot_ladder: null
+  # The fake's own flags, merged over the GPU ones, which the fake accepts and ignores (it
+  # parses only the flags it knows).
+  flags:
+    --port: "{port}"
+    --model-path: "{model}"
+    # The model's tokenizer in the fake, so ids round-trip with the probe's.
+    --tokenizer-dir: "{model}"
+    # The GPU run's value (P5.6-02: 8), so the argument check resolves the GPU set as is.
+    --max-running-requests: 8
+    # Short thinking: the twin checks the plumbing, not the model.
+    --think-tokens: 300
+    # A pool that allows the streams the GPU run would use.
+    --fake-pool: 400000
+    --incremental-streaming-output: true
+    --stream-interval: 16
+    # One python call per tool-arm task, then the answer.
+    --tool-calls: 1
+
+# The fork's argument check on the GPU run's flags: the twin installs the real SGLang, so its
+# ServerArgs resolves them on CPU; a refusal there fails the twin (exit 1) before any GPU run.
+arg_check:
+  # The fake server's own flags, which the fork's parser does not know (merged over the GPU
+  # flags above); the GPU flags themselves are all checked.
+  drop_flags: [--tokenizer-dir, --think-tokens, --fake-pool, --tool-calls]
+  # The GPU run's fallback boot flags (configs/P5.2-01.yaml, engine.boot_retry_flags, which
+  # this file sets to null), so the twin checks both of its flag sets.
+  retry_flags: {--kv-cache-dtype: bfloat16, --cuda-graph-backend-decode: disabled,
+                --cuda-graph-backend-prefill: disabled}
+
+# The stress check on the fake: short replies (the twin checks the plumbing).
+stress:
+  max_new: 64
+  timeout_s: 300
+
+solve:
+  # Both arms, as revisions 10 to 12 (revision 13's GPU run is plain only).
+  dev_arms: [plain, tool]
+  # Three of P6.9-01's tasks, both arms each: six attempts.
+  task_ids: [97d7923e, 247ef758, 7b3084d4]
+  # Small caps: the fake's replies are short; the forcing turn still runs on a cut reply.
+  cap: 2048
+  forcing_tokens: 1024
+  # The GPU run's limit (P5.6-02: 7).
+  max_streams: 7
+  request_timeout_s: 600

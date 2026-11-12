@@ -1,0 +1,8 @@
+{"puzzle_id": null, "op": "load", "seconds": 11.505336, "tokens": null}
+{"puzzle_id": "981571dc", "op": "train", "seconds": 852.781997, "tokens": 955392}
+{"puzzle_id": "981571dc", "op": "decode", "seconds": 92.749733, "tokens": 26136}
+{"puzzle_id": "981571dc", "op": "selection", "seconds": 14.320607, "tokens": 59712}
+{"puzzle_id": "981571dc", "op": "decode", "seconds": 92.892085, "tokens": 26136}
+{"puzzle_id": "981571dc", "op": "decode", "seconds": 93.083171, "tokens": 26136}
+{"puzzle_id": "981571dc", "op": "decode", "seconds": 92.648865, "tokens": 26136}
+{"puzzle_id": "981571dc", "op": "puzzle", "seconds": 1246.915281, "tokens": null}

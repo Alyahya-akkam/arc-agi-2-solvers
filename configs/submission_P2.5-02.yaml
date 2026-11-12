@@ -1,0 +1,118 @@
+# Submission notebook build for run P2.5-02: the gradient round on DEV40 on 4xL4 (BRIEF B5 P2.3,
+# P2.5, ADR-015, ADR-016): P2.3's round on DEV40, the loop's lift before P2.6's 12 h run. One
+# series arm, rank 16 on q, k, v, o with the embeddings frozen (P1.3-01 arm 2's scope, r16-attn,
+# G2's and H's, ADR-002) with the last real pair held out (as P2.1-01's arm) and, after each
+# puzzle's gate, one round with the gradient variant forced: the governor prices it,
+# promote checks the test inputs' voted answers, SGDProvider continues the adapter from a
+# snapshot for 32 steps, and a failed gate restores the snapshot; then the final decode, with the
+# held-out pair back in its prompts, gives the open test inputs their submitted candidates
+# (ADR-013 as amended). Its twin, run P2.5-01 (configs/submission_P2.5-01.yaml), forces the
+# in-context round on the same build, in a notebook of its own, so both batch GPU slots run them
+# at once. Read by scripts/build_submission.py and scripts/build_kaggle_notebook.py with
+# yaml.safe_load; runbook docs/runbooks/build_submission.md (series mode, round arms, variants);
+# pre-run brief docs/prerun/P2.5-02.md. A development build,
+# never to be submitted: its MANIFEST.md says "not for submission" (its notebook is not
+# alyahya737/arc26-submission, and it is a series), and a competition rerun would ignore the arm
+# and run the reference settings once.
+
+# A development notebook of its own, <owner>/<slug>, owner KAGGLE_OWNER of scripts/kaggle_ops.py:
+# one notebook per arm, so the two arms run at once in the account's two batch GPU sessions; a
+# slug belongs to one task branch (docs/prerun/README.md), and alyahya737/arc26-submission keeps
+# only builds meant for submission.
+kaggle_notebook: alyahya737/arc26-round-gradient
+
+# The same private code dataset as every build (ADR-010). One version holding this build's wheel
+# serves both P2.5 notebooks: both builds come from one commit, so their wheels are the same bytes.
+code_dataset: alyahya737/arc26-code
+
+# Competition attached: it mounts the data, and only notebooks attached to it get L4s (research
+# note, section 2).
+competition: arc-prize-2026-arc-agi-2
+
+# 4xL4, bf16 (the solver needs it), the hardware of P1.3-01, P2.1-01, and P2.1-02, whose
+# per-puzzle times the brief's estimates use, and of the scored rerun. There is no other accelerator to fall back on:
+# NvidiaL4X1 is not granted (Kaggle ran P0.3-01's NvidiaL4X1 push on its default 2xT4, 1 Oct), and
+# T4 has no bf16. The pre-run brief sets the 30-minute queue limit; the fallback is waiting.
+accelerator: NvidiaL4
+
+# Same pinned image and install notebook source as every build (ADR-010).
+reference_metadata: reference/kernel-metadata.json
+
+# Same install notebook version as every build (see configs/submission_P0.5-01.yaml).
+kernel_source_versions:
+  sorokin/pip-install-unsloth-flash-patch: 2
+
+# Same model folder name as every build (K0).
+model_slug: qwen3_4b_grids15_sft139
+
+# DEV40 (arc26.data.DEV40, frozen): 40 tasks, 55 test outputs, stratified by the largest grid
+# side; one task is 2.5 points. The tasks of P1.3-01, whose arm 2 (this scope, no hold-out, no
+# round: 10.5 of 40) is the baseline (B5 P2.5: "DEV40 lift versus P1 measured and reported").
+# Quoted so YAML never reads an id as a number.
+subset: [
+  "136b0064", "16de56c4", "195c6913", "20a9e565", "28a6681f", "2ba387bc", "31f7f899",
+  "332f06d7", "3e6067c3", "446ef5d2", "45a5af55", "4a21e3da", "581f7754", "5961cc34",
+  "64efde09", "7b0280bc", "7b5033c1", "7c66cb00", "80a900e0", "8698868d", "89565ca0",
+  "8f3a5a89", "9385bd28", "a25697e4", "b0039139", "b10624e5", "b5ca7ac4", "c7f57c3e",
+  "cbebaa4b", "db0c5428", "db695cfb", "dbff022c", "dd6b8c4b", "de809cff", "dfadab01",
+  "e12f9a14", "e3721c99", "e376de54", "eee78d87", "f560132c",
+]
+
+# One worker per L4, as P2.1-01, P2.1-02, and the scored rerun.
+workers: 4
+
+# Same PYTHONHASHSEED as P1.3-01, P2.1-01, P2.1-02, and every run since run A: one fixed seed for
+# all comparisons (CLAUDE.md), so round 0 draws P2.1-01's training, test, and gate views and its
+# rescoring augmentations, and the final decode P1.3-01's test views.
+hash_seed: 0
+
+# The run solves DEV40 once, with the gradient arm.
+run_solver: true
+
+# Seconds after the notebook's start: the workers' soft deadline, and the governor's end time,
+# from which each puzzle's budget is its share of the time left (Governor.puzzle_budget). With 40
+# puzzles on 4 workers an early puzzle's share is a tenth of the time left, so a round is admitted
+# only when that tenth covers round 0 and the round's price: P2.1-01's and P1.3-01 arm 2's
+# candidates put 13 DEV40 puzzles through the free checks, and their gradient rounds need a soft
+# deadline from 17,400 to 36,000 s (docs/prerun/P2.5-02.md, section 6). 41,400 s is the
+# competition's (12 h less 30 min, configs/governor.yaml deadline.end_s), the latest the 12 h
+# session allows with the hard stop and the write, and P2.5-01's; it admits all 13 rounds at their
+# estimated price. The run is expected to end near 13,400 s, so the deadline never binds on a
+# healthy run.
+solver_end_s: 41400
+
+# Seconds after the start: the hard stop, 900 s after the soft deadline, as P2.1-01. The brief's
+# Timeout is this plus 900 s (43,200 s, Kaggle's 12 h limit), for the selection and the logs.
+solver_kill_s: 42300
+
+# The solver's code (task P2.0, ADR-011): hold-out and rounds need the split solver, which trains
+# and decodes in separate calls (arc26.ttt.fit, arc26.decode.decode_puzzle).
+solver: split
+
+# The series, one arm: the gradient arm. Its twin is P2.5-01's in-context arm, and its baseline
+# P1.3-01 arm 2 (this scope with every pair and no round); P2.1-02's arm (the notebook
+# configuration, round 0 and the final decode of this run, no round) is a reference row.
+arms:
+  # Rank 16 on q, k, v, o, the embeddings and lm_head frozen: P1.3-01 arm 2's scope (r16-attn),
+  # not the notebook configuration (the orchestrator, 3 Oct): P2.6, the DEV120 run with the loop,
+  # must fit the rerun's time budget (P1.1-01 projects u of about 0.91 on 240 hidden tasks before
+  # any gate or round), and r16-attn took 490 s per puzzle against 606 s in P1.3-01, scored 10.5
+  # of 40 against 8.5 (ADR-002: it loses nothing), and is H's scope for Phase 4, so the loop's lift
+  # is measured on the scope P2.6 runs. The builder takes a first arm of another scope when it
+  # holds a pair out (submission.json comes from it; a series is never fit to submit).
+  - name: r16-attn-gradient
+    lora_r: 16
+    lora_targets: [q_proj, k_proj, v_proj, o_proj]
+    # B5 P2.1's rule, the last real pair by index; held out at k = 2 too (B5: a flag, default on,
+    # as P2.1-01 and P2.1-02); and out of the test inputs' prompts, which the rounds need: round
+    # 0's test decode feeds their promotion (ADR-013).
+    holdout: {rule: last, k2: true, in_test_prompts: false}
+    # One round (B5 P2.3: max_rounds default 1, P2.6's setting); tau 9/16, ADR-014's starting
+    # value; s' = 32 of the 128 views (ADR-015; about a quarter of round 0's fit, 96 s on
+    # average at this scope with a pair held out, docs/prerun/P2.5-02.md); the final decode with the held-out pair back in its prompts, the production path
+    # (ADR-013 as amended, P2.1-02); the governor's config as committed (P2.4), embedded by the
+    # builder; and the gradient round forced (task P2.5, ADR-016: Rounds' default, spelled out so
+    # the arms differ in variants alone; the solver JSON leaves the default out), P2.3's round.
+    rounds: {max_rounds: 1, tau: 0.5625, continue_steps: 32, final_in_prompts: true,
+             governor: configs/governor.yaml, variants: [gradient]}
+    reason: "Rank 16 on q, k, v, o (P2.6's scope), a held-out pair, and one gradient round with rollback (P2.3's), on DEV40"

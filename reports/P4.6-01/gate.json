@@ -1,0 +1,172 @@
+{
+ "gate": "Bad",
+ "reason": "no signal nets +2.0 with losses at most 1.0, or +1.0, on both runs",
+ "runs": {
+  "P2.6-01": {
+   "subset": "DEV120",
+   "score": 38.333333333333336,
+   "outputs_with_candidates": 142,
+   "informative": 21,
+   "gap_tasks": 6.166666666666666
+  },
+  "P1.1-01": {
+   "subset": "DEV120",
+   "score": 37.16666666666667,
+   "outputs_with_candidates": 161,
+   "informative": 20,
+   "gap_tasks": 6.833333333333333
+  }
+ },
+ "results": {
+  "primary": {
+   "poe": {
+    "P2.6-01": {
+     "switches": 14,
+     "recovered": 0.0,
+     "lost": 2.5,
+     "recovered_outputs": 0,
+     "lost_outputs": 3,
+     "undefined_informative": 0,
+     "informative": 21,
+     "right_on_informative": 9,
+     "net": -2.5
+    },
+    "P1.1-01": {
+     "switches": 18,
+     "recovered": 0.0,
+     "lost": 1.3333333333333333,
+     "recovered_outputs": 0,
+     "lost_outputs": 3,
+     "undefined_informative": 0,
+     "informative": 20,
+     "right_on_informative": 8,
+     "net": -1.3333333333333333
+    }
+   },
+   "cons": {
+    "P2.6-01": {
+     "switches": 37,
+     "recovered": 0.5,
+     "lost": 2.5,
+     "recovered_outputs": 1,
+     "lost_outputs": 3,
+     "undefined_informative": 0,
+     "informative": 21,
+     "right_on_informative": 10,
+     "net": -2.0
+    },
+    "P1.1-01": {
+     "switches": 38,
+     "recovered": 0.5,
+     "lost": 1.3333333333333333,
+     "recovered_outputs": 1,
+     "lost_outputs": 3,
+     "undefined_informative": 0,
+     "informative": 20,
+     "right_on_informative": 9,
+     "net": -0.8333333333333333
+    }
+   }
+  },
+  "any-slot": {
+   "poe": {
+    "P2.6-01": {
+     "switches": 21,
+     "recovered": 0.0,
+     "lost": 3.5,
+     "recovered_outputs": 0,
+     "lost_outputs": 5,
+     "undefined_informative": 0,
+     "informative": 21,
+     "right_on_informative": 10,
+     "net": -3.5
+    },
+    "P1.1-01": {
+     "switches": 25,
+     "recovered": 1.0,
+     "lost": 3.3333333333333335,
+     "recovered_outputs": 1,
+     "lost_outputs": 6,
+     "undefined_informative": 0,
+     "informative": 20,
+     "right_on_informative": 9,
+     "net": -2.3333333333333335
+    }
+   },
+   "cons": {
+    "P2.6-01": {
+     "switches": 48,
+     "recovered": 0.5,
+     "lost": 3.8333333333333335,
+     "recovered_outputs": 1,
+     "lost_outputs": 6,
+     "undefined_informative": 0,
+     "informative": 21,
+     "right_on_informative": 10,
+     "net": -3.3333333333333335
+    },
+    "P1.1-01": {
+     "switches": 58,
+     "recovered": 0.5,
+     "lost": 3.5,
+     "recovered_outputs": 1,
+     "lost_outputs": 7,
+     "undefined_informative": 0,
+     "informative": 20,
+     "right_on_informative": 10,
+     "net": -3.0
+    }
+   }
+  },
+  "two-se": {
+   "poe": {
+    "P2.6-01": {
+     "switches": 28,
+     "recovered": 0.0,
+     "lost": 3.0,
+     "recovered_outputs": 0,
+     "lost_outputs": 4,
+     "undefined_informative": 0,
+     "informative": 21,
+     "right_on_informative": 8,
+     "net": -3.0
+    },
+    "P1.1-01": {
+     "switches": 35,
+     "recovered": 0.0,
+     "lost": 2.333333333333333,
+     "recovered_outputs": 0,
+     "lost_outputs": 5,
+     "undefined_informative": 0,
+     "informative": 20,
+     "right_on_informative": 6,
+     "net": -2.333333333333333
+    }
+   },
+   "cons": {
+    "P2.6-01": {
+     "switches": 62,
+     "recovered": 0.8333333333333333,
+     "lost": 3.0,
+     "recovered_outputs": 2,
+     "lost_outputs": 4,
+     "undefined_informative": 0,
+     "informative": 21,
+     "right_on_informative": 10,
+     "net": -2.166666666666667
+    },
+    "P1.1-01": {
+     "switches": 70,
+     "recovered": 1.0,
+     "lost": 3.6666666666666665,
+     "recovered_outputs": 2,
+     "lost_outputs": 7,
+     "undefined_informative": 0,
+     "informative": 20,
+     "right_on_informative": 6,
+     "net": -2.6666666666666665
+    }
+   }
+  }
+ }
+}

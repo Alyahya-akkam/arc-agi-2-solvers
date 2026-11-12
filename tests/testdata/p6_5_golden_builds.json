@@ -1,0 +1,273 @@
+{
+ "commit": "8cac42ff4fbe9824a1c3e199bbeb731e41526de4",
+ "configs": {
+  "configs/script_MT-01.yaml": {
+   "MANIFEST.md": "c601b56241c18a0803ee1b55a1a909348a63131c279f6dbafa8d184ed31359b5",
+   "arc26-code/dataset-metadata.json": "0b6f288e977a9ed856241ba4d8488e50ac065a7bb32af00eecf1ea5a6deb4963",
+   "kaggle_script.ipynb": "2b5e62a45955201f88a3d879c1a9c0093586ef0ffd6a0484204e2979bdff8751",
+   "kernel-metadata.json": "6aa1884ccc4cd7345170bdca7bb16c0bf15681d48db504884ddad8e44d06c195"
+  },
+  "configs/script_MT-02.yaml": {
+   "MANIFEST.md": "1f5343ec965763ea81128ffea50bd53ec9179b2ddc9446b4435f2f9091f6724f",
+   "arc26-code/dataset-metadata.json": "9614c5ec2b41e5520c32677c3580d7940ecfbe5c665a4cf2487709bdcb346894",
+   "kaggle_script.ipynb": "e6f025237d33859b65ab52032ead19b521f68012e1d8abc95baf45b66c4e178a",
+   "kernel-metadata.json": "6dd843fa9b414a707cbafd5ae00e9de7d3d85208d30dca4f85ed8a3335ab76ad"
+  },
+  "configs/script_MT-03.yaml": {
+   "MANIFEST.md": "00290d751d477b4fcb8c836c0524311182ee7ba0970922c9fc1f889872f763b9",
+   "arc26-code/dataset-metadata.json": "9614c5ec2b41e5520c32677c3580d7940ecfbe5c665a4cf2487709bdcb346894",
+   "kaggle_script.ipynb": "5042b0909d0d1ea7660bfb2d7e4725390020b44b2ea3f2737339dc7048878460",
+   "kernel-metadata.json": "052cff0850fde022f0e3a90f285b0fd4d83aabf357330fd65588b8245cdd7c53"
+  },
+  "configs/script_MT-04.yaml": {
+   "MANIFEST.md": "f2814fd2c22ecd3a5adcfe0fc0be77ff1828d283d92ac4b532741ec10d745c4f",
+   "arc26-code/dataset-metadata.json": "9614c5ec2b41e5520c32677c3580d7940ecfbe5c665a4cf2487709bdcb346894",
+   "kaggle_script.ipynb": "ac9b34e63b75c0616706cc472f8c60f996b1c762f07eda03fd8d47ed2b8954ac",
+   "kernel-metadata.json": "a998126fde41ee958d5d57bfbfed1ef576be67ded486f65e44d35ffdc15ad5ea"
+  },
+  "configs/script_P3.1-01.yaml": {
+   "MANIFEST.md": "193b3af3c2557eef882cce03a68eed3b16cb2244eed53c4df34cbfd73168065e",
+   "arc26-code/dataset-metadata.json": "aa35c3f3d9754ccb63fd1aa585b1adc34c0c6bb4d3216c470f5684d4454fcbff",
+   "kaggle_script.ipynb": "9eb6a2a639293dc9b39990bb1c81601f61ac2be349dfbf12dd4d7188ccc0d46d",
+   "kernel-metadata.json": "b71088da3e51cffe16f89ecc6fd141493329f433a6a712478fd3912d44906117"
+  },
+  "configs/script_P3.2-01.yaml": {
+   "MANIFEST.md": "717041d6261f262c692e2c0356e55049f5c4a655dc32e143d824d56b64824cd4",
+   "arc26-code/dataset-metadata.json": "40ec051f164e17d6078eca557c2b9c5d179129fe7b914bec60e7586095cc4987",
+   "kaggle_script.ipynb": "bcdbec4f03654a34ab302856439df33f2badbb5c923300ffa205c4855f498f3b",
+   "kernel-metadata.json": "f170ccb8722f4549e6585f198c2d6775552f7a07804c55e4df9cbfa625021ad3"
+  },
+  "configs/script_P3.2-02.yaml": {
+   "MANIFEST.md": "537df38cafc1feb28d86f482328193c00f74aad047b7fa031190bf87f0a06bb0",
+   "arc26-code/dataset-metadata.json": "40ec051f164e17d6078eca557c2b9c5d179129fe7b914bec60e7586095cc4987",
+   "kaggle_script.ipynb": "fcbc872dcbc6f4ddf8bb8b3f1e163880d52ce28ca627aa42f0fb5652e7c05d54",
+   "kernel-metadata.json": "f170ccb8722f4549e6585f198c2d6775552f7a07804c55e4df9cbfa625021ad3"
+  },
+  "configs/script_P3.5-01.yaml": {
+   "MANIFEST.md": "5cb87477ba3ca836d703947475480f5e9a274d25780694b15d5a6c72cd550aa1",
+   "arc26-code/dataset-metadata.json": "8199010e7fa2b037400fdec551dfa015e45e990b927db18f91edd28c06698042",
+   "kaggle_script.ipynb": "6c2c434e8c27409fefb3c0bf534c4d7f17c4ddfe857eb19978dcb17a885e938d",
+   "kernel-metadata.json": "dc2b30122eb11b30ab083ddac1b0d611168aaf492436b631e0581380bc145f2d"
+  },
+  "configs/script_P3.5-02.yaml": {
+   "MANIFEST.md": "2c9adaa6b2eb03fe64422a2c48ad9c5a1992b1e7b1f3283e443cdc64107dc3a0",
+   "arc26-code/dataset-metadata.json": "8199010e7fa2b037400fdec551dfa015e45e990b927db18f91edd28c06698042",
+   "kaggle_script.ipynb": "725b721d627ffeaadb246a42723d977bb2fdedf20e090683bf7719263afec3af",
+   "kernel-metadata.json": "dc2b30122eb11b30ab083ddac1b0d611168aaf492436b631e0581380bc145f2d"
+  },
+  "configs/script_P3.6-01.yaml": {
+   "MANIFEST.md": "c04dee453db10800db909aceaa3c6fbb34a42bc4e8ce654fe058d938bbed9df3",
+   "arc26-code/dataset-metadata.json": "3f957827ee8a0b3d6c1f062d7b6962e31e9292bb1a36844d2374a752fa14e964",
+   "kaggle_script.ipynb": "9dc79dcf89f6d8a4263aa96f03ef2a8fdce3ffb08e90939fadbefc6a227a5f93",
+   "kernel-metadata.json": "b5dec10b68d831b996a54253e0ce1d4c0ad532ccb14e72da0137121e565b281f"
+  },
+  "configs/script_smoke.yaml": {
+   "MANIFEST.md": "df2e239db1b4799ccbbb44412b29b84899345803e5a80f42cab3f6f0889d8f1c",
+   "arc26-code/dataset-metadata.json": "e679cca905095fad8530d7980b17646b8eb12058f629d01cb7d49808555e486f",
+   "kaggle_script.ipynb": "7ed87dc97fe9824e0e0a4aff89debed8f4b66806b366ead2b6818e4d667bedd8",
+   "kernel-metadata.json": "537c4e3dcb4c1b8226a7ec50cdddb54e9646c58ee06381a1d1124d25f721a18e"
+  },
+  "configs/submission_P0.3-01.yaml": {
+   "MANIFEST.md": "6abf770fd05cf0662730551bf7f1ed1a0dcc815fea8e61118097830ff7ad0be6",
+   "arc26-code/dataset-metadata.json": "c442453397354500fa4c6a024a88906ec982e03548c2ab6a0b782a22dc0a1afe",
+   "kaggle_submission.ipynb": "f823ccb31c407739d4377a51942f2e3169ec8f78bbfedf48b8d5499a3fbe978a",
+   "kernel-metadata.json": "70769afcc5ab06de77458ae4b9f9c2e685d6ee46eb361738cd09b23194e6b813"
+  },
+  "configs/submission_P0.5-01.yaml": {
+   "MANIFEST.md": "680460cae66a6aada372bddb0695296c3de85603d55c62ba7d2292a164c62267",
+   "arc26-code/dataset-metadata.json": "c442453397354500fa4c6a024a88906ec982e03548c2ab6a0b782a22dc0a1afe",
+   "kaggle_submission.ipynb": "ae2c282c8f1643902fe97fda941f60740004c9fbfc87752ec6ccabd3617a2696",
+   "kernel-metadata.json": "ace458f2591eea7b03c2e991d97b00d01a87369526acdeaef1d3cad005cdfb53"
+  },
+  "configs/submission_P1.1-01.yaml": {
+   "MANIFEST.md": "ba49827a73139bdc2804dc9223fa59a9797ceca2a704911acd3a922b630b0121",
+   "arc26-code/dataset-metadata.json": "c442453397354500fa4c6a024a88906ec982e03548c2ab6a0b782a22dc0a1afe",
+   "kaggle_submission.ipynb": "203aaec583d0263ec2d1d1c92136a609f0b53bc9bc7282b8fe1cc966906870ab",
+   "kernel-metadata.json": "ace458f2591eea7b03c2e991d97b00d01a87369526acdeaef1d3cad005cdfb53"
+  },
+  "configs/submission_P1.3-01.yaml": {
+   "MANIFEST.md": "43c74eb2c2af08b787abdad1e9f9028755566ab581876eb6abe054ffcb058fef",
+   "arc26-code/dataset-metadata.json": "c442453397354500fa4c6a024a88906ec982e03548c2ab6a0b782a22dc0a1afe",
+   "kaggle_submission.ipynb": "9313691279cd9f1be832a6d4111401991b842284a59feef2cc33b39abcbf7b73",
+   "kernel-metadata.json": "dac127c9d4aa5b601986dc319ef9afb9e4fca45114da14d0f05d0a51dd7ba77a"
+  },
+  "configs/submission_P2.0-01.yaml": {
+   "MANIFEST.md": "d2739c040878ef454027a7e44e09f36de56db23ff80c6d0d46258b7444dd54fe",
+   "arc26-code/dataset-metadata.json": "c442453397354500fa4c6a024a88906ec982e03548c2ab6a0b782a22dc0a1afe",
+   "kaggle_submission.ipynb": "a464d0aaef54d12b82c7f5a411988a3d026ae3b541a16f98345e4d7fb51ad471",
+   "kernel-metadata.json": "5384abcd9eded8f7c1f622a9b439f86bcfffdc2ecea5d460eb54df1d9153abf9"
+  },
+  "configs/submission_P2.1-01.yaml": {
+   "MANIFEST.md": "78a78ee2022a5d3ddfdc8f847f14392bf72a78c63ab4c2b62d7cd10a3043f0f0",
+   "arc26-code/dataset-metadata.json": "c442453397354500fa4c6a024a88906ec982e03548c2ab6a0b782a22dc0a1afe",
+   "kaggle_submission.ipynb": "e07d12b87155272a471c951a3de221db75170fd53e9cccd276499e8e7d72c3fd",
+   "kernel-metadata.json": "a56cafcc3ef03ca9acdb50f4b43a3beaff01d50a542653cf0bee1d267ca5aa19"
+  },
+  "configs/submission_P2.1-02.yaml": {
+   "MANIFEST.md": "d59b869380648d6f08e1eee12e91fc4948bd6e2e85dbd0e52085ab540f0cd8fe",
+   "arc26-code/dataset-metadata.json": "c442453397354500fa4c6a024a88906ec982e03548c2ab6a0b782a22dc0a1afe",
+   "kaggle_submission.ipynb": "1bb6c7a97ef274cda78b0448d22d4a8c05f8f3a7ea3bffe59bbce832b9630bd1",
+   "kernel-metadata.json": "a56cafcc3ef03ca9acdb50f4b43a3beaff01d50a542653cf0bee1d267ca5aa19"
+  },
+  "configs/submission_P2.1-03.yaml": {
+   "MANIFEST.md": "e9e725a83cb75886e3e60e7d3fc8978ffe47768bd2d4aabd2c6de847ccbfc7b6",
+   "arc26-code/dataset-metadata.json": "c442453397354500fa4c6a024a88906ec982e03548c2ab6a0b782a22dc0a1afe",
+   "kaggle_submission.ipynb": "eb4e729349c115ef3628327896b32e82bc8b8c548398e387b3e6a119c776ca89",
+   "kernel-metadata.json": "e4468635e25403de8f5438a9ebd9a49820f0f598a200226498a414a602beaadf"
+  },
+  "configs/submission_P2.3-01.yaml": {
+   "MANIFEST.md": "ef98db8c90ff9ca8e82c508cba4bde4b96ee0c54a8047410b793468fabfc2df8",
+   "arc26-code/dataset-metadata.json": "c442453397354500fa4c6a024a88906ec982e03548c2ab6a0b782a22dc0a1afe",
+   "kaggle_submission.ipynb": "6af796c2bedf04c434664b3f2cd602158369fa3a4870a37ba3dcdfc5e6eeae3f",
+   "kernel-metadata.json": "2596979c45315f79387d20421ab69c6768a278bcdac795e45e67c4704bf3a755"
+  },
+  "configs/submission_P2.5-01.yaml": {
+   "MANIFEST.md": "d9a4811af844e84d245c8087218f39f74225feb4956fa8b6757264fa1e58f772",
+   "arc26-code/dataset-metadata.json": "c442453397354500fa4c6a024a88906ec982e03548c2ab6a0b782a22dc0a1afe",
+   "kaggle_submission.ipynb": "9e084afb2925ba113ef06a9a61aa3a2537333fd7956ffd96cb60a7331d5338bf",
+   "kernel-metadata.json": "e9ae59cd75f9f4cd9523fac4fcabc4d0793632368b8b916427d38e12db1caffd"
+  },
+  "configs/submission_P2.5-02.yaml": {
+   "MANIFEST.md": "faa275438e253b94448f144d71b65243354be7e2b434534db5965da15be06fa5",
+   "arc26-code/dataset-metadata.json": "c442453397354500fa4c6a024a88906ec982e03548c2ab6a0b782a22dc0a1afe",
+   "kaggle_submission.ipynb": "17f3ff798de51f18a7af926a2d61d844f4e18b5ce7a14d948ae6096fa52dfc58",
+   "kernel-metadata.json": "130262266d5705e670b2d4f0b40c209fa9cc9f2ed21a1c95d8851255245f0c44"
+  },
+  "configs/submission_P2.6-01.yaml": {
+   "MANIFEST.md": "0ca69b184ec91f7c55cd1631c96feec8a6a009c7b890baf607a313aa275ced98",
+   "arc26-code/dataset-metadata.json": "ec81509352f056bb3fae45fc3c9af1b564b53b7d8d33b79e4149b9de4a1b630a",
+   "kaggle_submission.ipynb": "2f9a956e50114bac9bc8d75737489a30f089f99091135bf55fa2785f8a973d94",
+   "kernel-metadata.json": "0fff9c453e734ff74b91aeba2db5eed2e45b5d08a1ed0ca2d0f5a053f0dc1f9a"
+  },
+  "configs/submission_cpu_check.yaml": {
+   "MANIFEST.md": "24a0b8956bf16c617bb38302d313baa8a6c432b7571ebca37dbf4bb6b7476782",
+   "arc26-code/dataset-metadata.json": "c442453397354500fa4c6a024a88906ec982e03548c2ab6a0b782a22dc0a1afe",
+   "kaggle_submission.ipynb": "311f7da4263dd07ffc3c55806e104043b0285bea3a8ef4765b84582d3a6308bf",
+   "kernel-metadata.json": "9fed14af45cb182bc755394463059f90051549827c1f91a3ac03c4cd98c73de2"
+  }
+ },
+ "inputs": {
+  "configs/script_MT-01.yaml": {
+   "configs/cache_embeddings_MT-01.yaml": "26b34229bf4abf2c5d1dfcf718c5b3ca89e3f7bf67dc90db6cf431a6cbd20036",
+   "configs/script_MT-01.yaml": "d14c60ed4920f8664e28687be73941767a1abc6e753a08449db546b5afeeab55",
+   "reference/kernel-metadata.json": "b1d9ce0f7c0137db9e80a85b57f5721decc0bebf21847c13f275525137271c9a",
+   "scripts/cache_embeddings.py": "f6985fdb10c2200972e088bb04ab77cb7a74468a643951503b17e8dcadba0c06"
+  },
+  "configs/script_MT-02.yaml": {
+   "configs/script_MT-02.yaml": "367b3cf15ccc23b0c31b72e05565bd8b52bb6ff30fe8840b36dd299731e1d758",
+   "configs/train_hypernet_MT.yaml": "9bde779942005e35956eba2194aff17fa939fce3fd5871e71b0eace5737f6906",
+   "reference/kernel-metadata.json": "b1d9ce0f7c0137db9e80a85b57f5721decc0bebf21847c13f275525137271c9a",
+   "scripts/train_hypernet.py": "1e7ed3df030692847ee7becea8d4c838738887e842643a631c7c960f13069db4"
+  },
+  "configs/script_MT-03.yaml": {
+   "configs/script_MT-03.yaml": "090a17636dffa6bef0ac5728aba2e98c01d249758f502430eea68f0397453ff8",
+   "configs/train_hypernet_MT.yaml": "9bde779942005e35956eba2194aff17fa939fce3fd5871e71b0eace5737f6906",
+   "reference/kernel-metadata.json": "b1d9ce0f7c0137db9e80a85b57f5721decc0bebf21847c13f275525137271c9a",
+   "scripts/train_hypernet.py": "1e7ed3df030692847ee7becea8d4c838738887e842643a631c7c960f13069db4"
+  },
+  "configs/script_MT-04.yaml": {
+   "configs/script_MT-04.yaml": "be19c88c7855a8f5058debd95b60e8c3238e96590702080a33f7e6a6524ac65c",
+   "configs/train_hypernet_MT.yaml": "9bde779942005e35956eba2194aff17fa939fce3fd5871e71b0eace5737f6906",
+   "reference/kernel-metadata.json": "b1d9ce0f7c0137db9e80a85b57f5721decc0bebf21847c13f275525137271c9a",
+   "scripts/train_hypernet.py": "0efc3791abf46f499ad69bc0b8cf001a2585980f82f7a1405c408e6fec023af1"
+  },
+  "configs/script_P3.1-01.yaml": {
+   "configs/inject_parity.yaml": "62c4b9210fc214414c5c57693a1c832e021d12c36d6fdd8b90ba1579eb643ab8",
+   "configs/script_P3.1-01.yaml": "0d6ebfe2c2cd3d706f07384f4bab702e9d2675df4ba699d83436cfcf2578005c",
+   "reference/kernel-metadata.json": "b1d9ce0f7c0137db9e80a85b57f5721decc0bebf21847c13f275525137271c9a",
+   "scripts/inject_parity.py": "fdec0417b768be9cce46206b3d7eb530b66f6445050a9d331db5a52741aac57e"
+  },
+  "configs/script_P3.2-01.yaml": {
+   "configs/cache_embeddings.yaml": "0c0026713f14922281c04b271574aa81d78a0571a2ba51dbb63aa0b8b9d06ba0",
+   "configs/script_P3.2-01.yaml": "e16b2b1c88a44ec89257dcfeed00486fddb4300c4dde8e6f02e63c72965ce9f6",
+   "reference/kernel-metadata.json": "b1d9ce0f7c0137db9e80a85b57f5721decc0bebf21847c13f275525137271c9a",
+   "scripts/cache_embeddings.py": "f6985fdb10c2200972e088bb04ab77cb7a74468a643951503b17e8dcadba0c06"
+  },
+  "configs/script_P3.2-02.yaml": {
+   "configs/cache_embeddings_P3.2-02.yaml": "d21e63964dcf3ef9795f7a38c4a7e3e7bd63973cd8697cf91ea0a9c3d6ff4b72",
+   "configs/script_P3.2-02.yaml": "6f4ff34fe737034318a7cd6c71559ae15015c249bc83d25a15b9fc255033a1fc",
+   "reference/kernel-metadata.json": "b1d9ce0f7c0137db9e80a85b57f5721decc0bebf21847c13f275525137271c9a",
+   "scripts/cache_embeddings.py": "f6985fdb10c2200972e088bb04ab77cb7a74468a643951503b17e8dcadba0c06"
+  },
+  "configs/script_P3.5-01.yaml": {
+   "configs/script_P3.5-01.yaml": "855e3a8b596ccba6ae19e37d39b039385e03d36408f20523e7a8c2a54c412c6e",
+   "configs/train_hypernet_toy.yaml": "0e2a2a03acb944a7009ba5f45bbdc70500abd18ec8581bbbd884e1052aeb0b2d",
+   "reference/kernel-metadata.json": "b1d9ce0f7c0137db9e80a85b57f5721decc0bebf21847c13f275525137271c9a",
+   "scripts/train_hypernet.py": "1e7ed3df030692847ee7becea8d4c838738887e842643a631c7c960f13069db4"
+  },
+  "configs/script_P3.5-02.yaml": {
+   "configs/script_P3.5-02.yaml": "d948ddd3e71a67668052782fdccad69697ed9e17513c8e6562adf485ca20c377",
+   "configs/train_hypernet_toy_P3.5-02.yaml": "1c6eb4efc257bfb86078495d9c9d7ddd4cab931db8fb38fe9291184630bb9832",
+   "reference/kernel-metadata.json": "b1d9ce0f7c0137db9e80a85b57f5721decc0bebf21847c13f275525137271c9a",
+   "scripts/train_hypernet.py": "1e7ed3df030692847ee7becea8d4c838738887e842643a631c7c960f13069db4"
+  },
+  "configs/script_P3.6-01.yaml": {
+   "configs/script_P3.6-01.yaml": "a9e819e3c860afff56683b67a3c84b6b6329be0a957ebb836f40ae89db3328eb",
+   "configs/train_throughput.yaml": "e67f4defbe9f983ab41d266edf295d37fe4d1a74c75231f213f5e341dc8c4e7c",
+   "reference/kernel-metadata.json": "b1d9ce0f7c0137db9e80a85b57f5721decc0bebf21847c13f275525137271c9a",
+   "scripts/train_throughput.py": "92a73a46c6437372f4805610e71ea14028435b5bfa2226db4d87895f78fc5a9b"
+  },
+  "configs/script_smoke.yaml": {
+   "configs/script_smoke.yaml": "d2de876d3e6db31c81bea599138f42209e46fb9bbe6f631c6cd0692cdaa6a5a4",
+   "reference/kernel-metadata.json": "b1d9ce0f7c0137db9e80a85b57f5721decc0bebf21847c13f275525137271c9a",
+   "scripts/env_probe.py": "24ef43391b960e0a0e313801edd99f7508389aea81928e931ba51c5a7fcc1a13"
+  },
+  "configs/submission_P0.3-01.yaml": {
+   "configs/submission_P0.3-01.yaml": "25faf60f0c508f371e7fe4f679cd9d97924bdff406cf31907c2f097466213861",
+   "reference/kernel-metadata.json": "b1d9ce0f7c0137db9e80a85b57f5721decc0bebf21847c13f275525137271c9a"
+  },
+  "configs/submission_P0.5-01.yaml": {
+   "configs/submission_P0.5-01.yaml": "f212247f48bc1434d43dd9d561829565700478edd9c2fac11418727209035f98",
+   "reference/kernel-metadata.json": "b1d9ce0f7c0137db9e80a85b57f5721decc0bebf21847c13f275525137271c9a"
+  },
+  "configs/submission_P1.1-01.yaml": {
+   "configs/submission_P1.1-01.yaml": "06995bb2f96a00212c3377e86a442baf20001990bc95faf58ce982f218b1cf12",
+   "reference/kernel-metadata.json": "b1d9ce0f7c0137db9e80a85b57f5721decc0bebf21847c13f275525137271c9a"
+  },
+  "configs/submission_P1.3-01.yaml": {
+   "configs/submission_P1.3-01.yaml": "b05cc154aea0d7e8f1bc941bc9a3ca44fe9024281b81e9d39dda084a5146b298",
+   "reference/kernel-metadata.json": "b1d9ce0f7c0137db9e80a85b57f5721decc0bebf21847c13f275525137271c9a"
+  },
+  "configs/submission_P2.0-01.yaml": {
+   "configs/submission_P2.0-01.yaml": "50da1fa08166a5ac4d82becaa42c681b12e1e34271babe6d8c918530aba7e0f4",
+   "reference/kernel-metadata.json": "b1d9ce0f7c0137db9e80a85b57f5721decc0bebf21847c13f275525137271c9a"
+  },
+  "configs/submission_P2.1-01.yaml": {
+   "configs/submission_P2.1-01.yaml": "3b4a9c8f5ef00f540c63e9591e2988a9056bf27d6b02370738a6a2d4e12501a9",
+   "reference/kernel-metadata.json": "b1d9ce0f7c0137db9e80a85b57f5721decc0bebf21847c13f275525137271c9a"
+  },
+  "configs/submission_P2.1-02.yaml": {
+   "configs/submission_P2.1-02.yaml": "230fb8c0f8ed9eb2196b29db2d5beac6daf0c7dfb5446aaee202db2758abd866",
+   "reference/kernel-metadata.json": "b1d9ce0f7c0137db9e80a85b57f5721decc0bebf21847c13f275525137271c9a"
+  },
+  "configs/submission_P2.1-03.yaml": {
+   "configs/submission_P2.1-03.yaml": "8bc7ee50f0fbf148177541481383562e551a4744d96a12c4a356f67cb99143b9",
+   "reference/kernel-metadata.json": "b1d9ce0f7c0137db9e80a85b57f5721decc0bebf21847c13f275525137271c9a"
+  },
+  "configs/submission_P2.3-01.yaml": {
+   "configs/governor.yaml": "fc72d7c220fb8cce43565cce7dddd4ed58a36ce9cba62dc1f6b3ddfa6c78bd49",
+   "configs/submission_P2.3-01.yaml": "717e355103615d8ed915732b3cb79b2ae92069f38b9f4141289a76d990b03aba",
+   "reference/kernel-metadata.json": "b1d9ce0f7c0137db9e80a85b57f5721decc0bebf21847c13f275525137271c9a"
+  },
+  "configs/submission_P2.5-01.yaml": {
+   "configs/governor.yaml": "fc72d7c220fb8cce43565cce7dddd4ed58a36ce9cba62dc1f6b3ddfa6c78bd49",
+   "configs/submission_P2.5-01.yaml": "4e9487989b58652cbf9d49ef74f7d0e327599fcd9d04c1daf3dca33bd0d9ab9c",
+   "reference/kernel-metadata.json": "b1d9ce0f7c0137db9e80a85b57f5721decc0bebf21847c13f275525137271c9a"
+  },
+  "configs/submission_P2.5-02.yaml": {
+   "configs/governor.yaml": "fc72d7c220fb8cce43565cce7dddd4ed58a36ce9cba62dc1f6b3ddfa6c78bd49",
+   "configs/submission_P2.5-02.yaml": "00d91cd41ca69f7f6326082b5de2bdfc9feeb3c31afe8983229e31556cae713f",
+   "reference/kernel-metadata.json": "b1d9ce0f7c0137db9e80a85b57f5721decc0bebf21847c13f275525137271c9a"
+  },
+  "configs/submission_P2.6-01.yaml": {
+   "configs/submission_P2.6-01.yaml": "5dcbad423a77aa7922df03c9e141924523dd0646afb234c010a4b811f603d4f2",
+   "reference/kernel-metadata.json": "b1d9ce0f7c0137db9e80a85b57f5721decc0bebf21847c13f275525137271c9a"
+  },
+  "configs/submission_cpu_check.yaml": {
+   "configs/submission_cpu_check.yaml": "de4a9057253ac8587ce2a4c8cffe3a0167cf09b0643bc67af06ae325009222c2",
+   "reference/kernel-metadata.json": "b1d9ce0f7c0137db9e80a85b57f5721decc0bebf21847c13f275525137271c9a"
+  }
+ },
+ "int_w43": "Task int-W43 (task/X2 with task/P3.9, task/P3.7, and task/P6.9, 18 Oct): the entries of configs/script_MT-01.yaml, configs/script_P3.1-01.yaml, configs/script_P3.2-01.yaml, configs/script_P3.2-02.yaml, configs/script_P3.6-01.yaml, configs/script_smoke.yaml re-recorded with the merged builders. Cause: task MT's clock logging (MT-03 revision 3, fde6baa) adds session_clocks to every script build's Helpers cell and the clocks line to its environment check and note, so kaggle_script.ipynb and MANIFEST.md's line for it changed; kernel-metadata.json and dataset-metadata.json did not, and neither did any input. The function is task P6.5b's, the one definition the merge kept. configs/script_MT-04.yaml added: task MT committed it after 8cac42f, so this file lacked it. Every other entry is as recorded.",
+ "note": "Digests of every committed build config's golden files (tests/test_scope_build.py's golden_files) with the builders before task P6.5"
+}

@@ -1,0 +1,131 @@
+# Run P5.6-02 (task P5.6, brief docs/prerun/P5.6-02.md): the 8-stream route again, on revision
+# 21's code (task/P5.9 348d958: the N+1 admission fix, P5.8's harness fixes) with P5.6-01's
+# engine levers (configuration 8B of docs/research/fn_many_streams.md, task/ideas 420afb4) and
+# P5.6-01's out-of-memory fault removed. P5.6-01 (arc26-fn-8b version 1) at
+# --mem-fraction-static 0.96 had two CUDA out-of-memory restarts (40 MiB requested, 32.5 MiB
+# free, peak 22,541 MiB per GPU) that cost a395ee82. Here: the fraction back to revision 21's
+# 0.95, 7 client streams on 8 server slots (the N+1 rule), decode graphs to 7, the Mamba slots by
+# the fork's lazy rule for 8 server slots. The batch sweep at 1 2 4 6 7 8 before the solve; the
+# boot ladder falls back to revision 21 as built. Every value below is revision 21's
+# (configs/P5.2-01.yaml) but those each comment names. The fraction, the streams, and the
+# chunked-prefill size stay plain config values (the researcher's report on the fault's
+# allocation site may change one).
+extends: configs/P5.2-01.yaml
+
+run_id: P5.6-02
+
+kernel:
+  # P5.6-01's notebook (version 2 by this push; submittable): not arc26-submission, revision
+  # 21's.
+  id: alyahya737/arc26-fn-8b
+  title: arc26 fn 8b
+  # P5.6-01's code dataset, a new version (this lineage's fn_probe.py has the sweep and the
+  # ladder's variable removal; the wheel has P5.8's fixes).
+  code_dataset: alyahya737/arc26-code-fn-8b
+
+inputs:
+  code:
+    path: /kaggle/input/datasets/alyahya737/arc26-code-fn-8b
+    # This lineage's dataset first; the older names still match a Modal job's code mount.
+    hint: [arc26-code-fn-8b, arc26-code-fn]
+
+engine:
+  flags:
+    # P5.6-01's lazy second ping-pong slot with the skip lock (env below): the fork's ratio
+    # (kv_cache_configurator.py _calculate_mamba_ratio) is 3 - 1 (skip lock) + 1 (lazy, overlap
+    # scheduler) = 3 slots per server slot instead of revision 21's 5. P5.6-01 locked 2 per
+    # running request (engine.log "mamba num" 2, 4, 6, 8, 10, 12, 14, 16 at 1 to 8 running).
+    --mamba-radix-cache-strategy: extra_buffer_lazy
+    # 0.95, revision 21's (P5.6-01: 0.96, whose 0.216 GiB per GPU less slack ran out at a 40 MiB
+    # allocation; version 17 at 0.95 peaked at 21,911 MiB, version 16 at 22,341).
+    --mem-fraction-static: 0.95
+    # P5.6-01's vision skip (fn_l4_memory.md risk 5): about 0.31 GiB per GPU of vision weights
+    # and VLM reserve go to the pool; 1D positions, so prefill graphs stay off.
+    --json-model-override-args: {language_model_only: true}
+    --cuda-graph-backend-prefill: disabled
+    # 8 = 7 client streams (solve.max_streams) + 1, revision 21's N+1 rule: the batch_is_full
+    # latch counts a chunked request twice (fn_many_streams.md section 3.4).
+    --max-running-requests: 8
+    # 24 = 3 x 8, the fork's floor for 8 server slots at ratio 3, no spare (revision 21's rule):
+    # the cap max_mamba_cache_size // 3 = 8 keeps the 8 slots; slots are taken per admitted
+    # request and cached states use any free one, so 7 streams lock about 14 and leave 10 (P5.6-01:
+    # 13 of 29 at 8 running; revision 21: 10 of 30). Pool (estimate): P5.6-01's measured 377,856
+    # at 0.96 and 29 slots, less 0.01 of the fraction (0.216 GiB per GPU at 4,224 B per KV4 token:
+    # 54,907), plus 5 slots of 3,482: about 340,359, so 7 streams at about 48,622.
+    --max-mamba-cache-size: 24
+    # Graphs to the client's 7 (P5.6-01: 1 2 4 6 8): five sizes as P5.6-01's capture (its boot
+    # 766 s); a batch of 8 (the sweep's last size only) decodes eagerly.
+    --cuda-graph-max-bs-decode: 7
+    --cuda-graph-bs-decode: [1, 2, 4, 6, 7]
+    # 1,024 (revision 21: 2,048), the researcher's reading of P5.6-01's fault
+    # (fn_p56_suspects.md, task/ideas 513e835, section 3): the 40 MiB that failed was the
+    # per-layer-embedding short conv's F.silu in eager prefill (qwen4_exp.py:1125), whose extend
+    # buffers pad to [R, max(extend_seq_lens), conv_channels], a full 2,048-token chunk at 8
+    # requests; 1,024 halves the length and caps the row width. A config value: the next
+    # reading may change it.
+    --chunked-prefill-size: 1024
+    # At most 4 requests per prefill batch (the same reading: it caps R); the fork's
+    # ServerArgs.prefill_max_requests (default: no limit). The twin's argument check resolves it
+    # with the fork's parser, which exits on an unknown flag (a refused verdict, exit 1).
+    --prefill-max-requests: 4
+    # Off, stated (false leaves the flag out, the fork's default): mixing prefill and decode in a
+    # batch is the case extra_buffer_lazy has no known bug without (the same note).
+    --enable-mixed-chunk: false
+  env:
+    # P5.6-01's skip lock: the matched prefix's state is evictable during decode
+    # (environ.py:1241-1245), one slot less per request in the fork's ratio.
+    SGLANG_OPT_MAMBA_SKIP_DECODE_LOCK: "1"
+    # P5.6-01's: no VLM cache reserve (0.10 GiB per GPU; text never fills it).
+    SGLANG_VLM_CACHE_SIZE_MB: "0"
+  # The ladder after the first boot, cumulative (fn_probe.boot_rungs); each rung follows a failed
+  # boot or a failed first generation; restarts.jsonl records the reason.
+  boot_ladder:
+    # Rung 1: revision 21 as built (extra_buffer, 0.95, the vision tower on, 6 server slots,
+    # Mamba 30, graphs 1 to 5, KV4 on): null removes this run's own flags and variables.
+    - flags: {--mamba-radix-cache-strategy: extra_buffer, --mem-fraction-static: 0.95,
+              --json-model-override-args: null, --cuda-graph-backend-prefill: null,
+              --max-running-requests: 6, --max-mamba-cache-size: 30,
+              --cuda-graph-max-bs-decode: 5, --cuda-graph-bs-decode: [1, 2, 3, 4, 5],
+              --chunked-prefill-size: 2048, --prefill-max-requests: null,
+              --enable-mixed-chunk: null}
+      env: {SGLANG_OPT_MAMBA_SKIP_DECODE_LOCK: null, SGLANG_VLM_CACHE_SIZE_MB: null}
+    # Rung 2: revision 16's engine (the KV4 files restored, ARC26_KV4=0, fn_probe.restore_kv4).
+    - {env: {ARC26_KV4: "0"}}
+    # Rung 3: BF16 KV and no CUDA graphs, still revision 16's engine.
+    - {flags: {--kv-cache-dtype: bfloat16, --cuda-graph-backend-decode: disabled,
+               --cuda-graph-backend-prefill: disabled}}
+
+# The health probe (3 probes of 30 s, tied to the engine instance) and the boot stress check are
+# revision 22's (configs/P5.2-01.yaml), inherited: here the stress check's batch is the 7 streams.
+stress:
+  # P5.6-02 already runs the smaller prefill (the flags above), so a failure goes straight to
+  # rung 1, revision 21 as built (null replaces revision 22's fallback flags).
+  fallback_flags: null
+
+solve:
+  # 7 (revision 21: 5): the server's 8 less the latch's one. The planner gives 7 from
+  # 7 x 42,168 = 295,176 tokens of pool (the floor 29,000 plus the largest opening, the forcing
+  # turn, and the margin); the context per stream is floor(pool / 7), the cap 49,152.
+  max_streams: 7
+
+# The batch sweep before the solve (fn_probe.stage_sweep): decode at 1 2 4 6 7 8 concurrent
+# requests, 512 tokens each with ignore_eos (P5.6-01's 5 sizes took 78.8 s; 6 sizes about 100 s).
+sweep:
+  enabled: true
+  modes: [development]
+  batches: [1, 2, 4, 6, 7, 8]
+  max_new: 512
+  # A short prompt (about 157 tokens); the radix cache serves it after the first request.
+  prompt: "Each grid is rows of digits. In every example the output grid is the input grid with every 1 replaced by 2. Example input: 0 1 0 / 1 0 1 / 0 1 0. Example output: 0 2 0 / 2 0 2 / 0 2 0. Describe the rule in detail, then apply it to 1 1 0 / 0 1 1 / 1 0 0."
+  # Seconds for one size's requests (512 tokens at 10 per second is 51 s).
+  timeout_s: 300
+  # No size starts within 30 minutes of the generation stop: the solve keeps its time.
+  stop_before_s: 1800
+
+smoke:
+  # The fake's stress check goes to rung 1 on a failure, as the GPU run's.
+  stress: {enabled: true, modes: [development, competition], max_new: 32, timeout_s: 60,
+           filler: "0 1\n", fallback_flags: null}
+  # The fake server's sweep: two sizes, short replies.
+  sweep: {enabled: true, modes: [development], batches: [1, 2], max_new: 64, timeout_s: 30,
+          stop_before_s: 5, prompt: "0 1 / 1 0"}
